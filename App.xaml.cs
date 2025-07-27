@@ -18,7 +18,6 @@ public partial class App : Application
     private static IExcelExportService? _excelExportService;
     private static string? _logFilePath;
 
-    // Service locator properties
     public static IConfigurationService ConfigurationService
     {
         get
@@ -55,7 +54,6 @@ public partial class App : Application
                 _configService ??= new ConfigurationService();
                 _logFilePath = _configService.GetLogFilePath();
                 
-                // Ensure log directory exists
                 var logDir = Path.GetDirectoryName(_logFilePath);
                 if (!string.IsNullOrEmpty(logDir) && !Directory.Exists(logDir))
                 {
@@ -73,18 +71,15 @@ public partial class App : Application
             LogMessage("Application starting...");
             LogMessage($"Command line args: {string.Join(" ", e.Args)}");
             
-            // Set up global exception handling
             AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
             DispatcherUnhandledException += App_DispatcherUnhandledException;
             
             LogMessage("Exception handlers registered");
             
-            // Call base startup without StartupUri
             base.OnStartup(e);
             
             LogMessage("Creating and showing MainWindow manually...");
             
-            // Manually create and show the main window
             var mainWindow = new TradeDataEXP.Views.MainWindow();
             mainWindow.Show();
             

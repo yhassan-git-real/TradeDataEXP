@@ -17,6 +17,7 @@ namespace TradeDataEXP.Services
         string GetViewName();
         int GetQueryTimeout();
         int GetQueryTopLimit();
+        bool GetUseTopLimit();
         
         // Column mapping methods
         string GetColumnName(string logicalColumnName);
@@ -61,7 +62,6 @@ namespace TradeDataEXP.Services
                 {
                     var trimmedLine = line.Trim();
                     
-                    // Skip empty lines and comments
                     if (string.IsNullOrEmpty(trimmedLine) || trimmedLine.StartsWith("#"))
                         continue;
 
@@ -71,7 +71,6 @@ namespace TradeDataEXP.Services
                         var key = trimmedLine.Substring(0, equalIndex).Trim();
                         var value = trimmedLine.Substring(equalIndex + 1).Trim();
                         
-                        // Remove quotes if present
                         if (value.StartsWith("\"") && value.EndsWith("\""))
                         {
                             value = value.Substring(1, value.Length - 2);
@@ -81,7 +80,6 @@ namespace TradeDataEXP.Services
                     }
                 }
 
-                // Validate that all required configuration keys are present
                 ValidateRequiredConfiguration();
             }
             catch (Exception ex) when (!(ex is FileNotFoundException || ex is InvalidOperationException))
@@ -98,7 +96,6 @@ namespace TradeDataEXP.Services
                 "DB_VIEW_NAME", "DB_SCHEMA", "STORED_PROCEDURE_NAME",
                 "LOG_DIRECTORY", "LOG_FILENAME_BASE", "OUTPUT_DIRECTORY",
                 "QUERY_TOP_LIMIT", "QUERY_TIMEOUT",
-                // Column mapping keys
                 "COLUMN_HS_CODE", "COLUMN_PRODUCT", "COLUMN_EXPORTER_NAME",
                 "COLUMN_IEC", "COLUMN_FOREIGN_IMPORTER", "COLUMN_DESTINATION_COUNTRY",
                 "COLUMN_PORT_ORIGIN", "COLUMN_MONTH_SERIAL", "COLUMN_SB_DATE", "COLUMN_ORDER_BY"
@@ -178,7 +175,6 @@ namespace TradeDataEXP.Services
             var logDir = GetValue("LOG_DIRECTORY");
             var baseLogFile = GetValue("LOG_FILENAME_BASE");
             
-            // Add current date to the filename (format: YYYYMMDD)
             var dateStamp = DateTime.Now.ToString("yyyyMMdd");
             var logFileWithDate = $"{baseLogFile}_{dateStamp}.txt";
             
@@ -222,7 +218,11 @@ namespace TradeDataEXP.Services
             return GetValue<int>("QUERY_TOP_LIMIT");
         }
 
-        // Column mapping methods implementation
+        public bool GetUseTopLimit()
+        {
+            return GetValue<bool>("QUERY_USE_TOP_LIMIT", true);
+        }
+
         public string GetColumnName(string logicalColumnName)
         {
             return GetValue($"COLUMN_{logicalColumnName.ToUpper()}");
