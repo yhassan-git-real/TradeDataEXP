@@ -127,4 +127,17 @@ public class ExportData : DynamicObject
         }
         return exportData;
     }
+
+    /// <summary>
+    /// Creates an ExportData instance from a non-nullable dictionary (Dapper compatibility)
+    /// </summary>
+    public static ExportData FromDapper(IDictionary<string, object> data)
+    {
+        var exportData = new ExportData();
+        foreach (var kvp in data)
+        {
+            exportData.SetValue(kvp.Key, kvp.Value);
+        }
+        return exportData;
+    }
 }

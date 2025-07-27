@@ -39,98 +39,66 @@ public class ExcelExportService : IExcelExportService
             {
                 // If no data, create empty worksheet with message
                 worksheet.Cell(1, 1).Value = "No data available for export";
-                var outputDir = _configService.GetOutputDirectory();
-                Directory.CreateDirectory(outputDir);
-                var filePath = Path.Combine(outputDir, $"{fileName}_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx");
-                workbook.SaveAs(filePath);
-                return filePath;
+                var emptyOutputDir = _configService.GetOutputDirectory();
+                Directory.CreateDirectory(emptyOutputDir);
+                var emptyFilePath = Path.Combine(emptyOutputDir, $"{fileName}_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx");
+                workbook.SaveAs(emptyFilePath);
+                return emptyFilePath;
             }
 
             // Get column names dynamically from the first record
             var firstRecord = dataList.First();
             var columnNames = firstRecord.GetColumnNames().ToList();
 
-            // Set headers dynamically
+            // Set headers with exact template styling (Accent1 background, like templates)
             for (int i = 0; i < columnNames.Count; i++)
             {
                 var cell = worksheet.Cell(1, i + 1);
                 cell.Value = FormatColumnHeader(columnNames[i]);
+                
+                // Apply exact template formatting (Times New Roman, Bold, Accent1 background)
+                cell.Style.Font.FontName = "Times New Roman";
+                cell.Style.Font.FontSize = 10;
                 cell.Style.Font.Bold = true;
-                cell.Style.Fill.BackgroundColor = XLColor.LightBlue;
-                cell.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+                cell.Style.Border.TopBorder = XLBorderStyleValues.Thin;
+                cell.Style.Border.BottomBorder = XLBorderStyleValues.Thin;
+                cell.Style.Border.LeftBorder = XLBorderStyleValues.Thin;
+                cell.Style.Border.RightBorder = XLBorderStyleValues.Thin;
+                // Template uses Accent1 color theme (light blue background)
+                cell.Style.Fill.BackgroundColor = XLColor.FromTheme(XLThemeColor.Accent1, 0.5);
+                cell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                cell.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+                cell.Style.Alignment.WrapText = false;
             }
 
-            // Add data
-            var dataList = data.ToList();
+            // Add data dynamically
             for (int row = 0; row < dataList.Count; row++)
             {
                 var item = dataList[row];
                 var excelRow = row + 2; // Start from row 2 (after header)
 
-                worksheet.Cell(excelRow, 1).Value = item.SB_NO;
-                worksheet.Cell(excelRow, 2).Value = item.HS4;
-                worksheet.Cell(excelRow, 3).Value = item.SB_Date;
-                worksheet.Cell(excelRow, 4).Value = item.HS_Code;
-                worksheet.Cell(excelRow, 5).Value = item.Product;
-                worksheet.Cell(excelRow, 6).Value = item.QTY;
-                worksheet.Cell(excelRow, 7).Value = item.Unit;
-                worksheet.Cell(excelRow, 8).Value = item.UnitRateInForeignCurrency;
-                worksheet.Cell(excelRow, 9).Value = item.UnitRateCurrency;
-                worksheet.Cell(excelRow, 10).Value = item.ValueInFC;
-                worksheet.Cell(excelRow, 11).Value = item.TotalSBValueInINRInLacs;
-                worksheet.Cell(excelRow, 12).Value = item.UnitRateINR;
-                worksheet.Cell(excelRow, 13).Value = item.FOB_USD;
-                worksheet.Cell(excelRow, 14).Value = item.Unit_Rate_USD;
-                worksheet.Cell(excelRow, 15).Value = item.PortOfDestination;
-                worksheet.Cell(excelRow, 16).Value = item.CtryOfDestination;
-                worksheet.Cell(excelRow, 17).Value = item.PortOfOrigin;
-                worksheet.Cell(excelRow, 18).Value = item.Ship_Mode;
-                worksheet.Cell(excelRow, 19).Value = item.IEC;
-                worksheet.Cell(excelRow, 20).Value = item.IndianExporterName;
-                worksheet.Cell(excelRow, 21).Value = item.ExporterAdd1;
-                worksheet.Cell(excelRow, 22).Value = item.ExporterAdd2;
-                worksheet.Cell(excelRow, 23).Value = item.ExporterCity;
-                worksheet.Cell(excelRow, 24).Value = item.Pin;
-                worksheet.Cell(excelRow, 25).Value = item.ForeignImporterName;
-                worksheet.Cell(excelRow, 26).Value = item.FOR_Add1;
-                worksheet.Cell(excelRow, 27).Value = item.Item_no;
-                worksheet.Cell(excelRow, 28).Value = item.Invoice_no;
-                worksheet.Cell(excelRow, 29).Value = item.DRAW_BACK;
-                worksheet.Cell(excelRow, 30).Value = item.CHA_NO;
-                worksheet.Cell(excelRow, 31).Value = item.CHA_NAME;
-                worksheet.Cell(excelRow, 32).Value = item.std_qty;
-
-                // Apply alternating row colors
-                if (row % 2 == 1)
+                for (int col = 0; col < columnNames.Count; col++)
                 {
-                    var range = worksheet.Range(excelRow, 1, excelRow, headers.Length);
-                    range.Style.Fill.BackgroundColor = XLColor.LightGray;
+                    var columnName = columnNames[col];
+                    var cellValue = item.GetValue<object>(columnName);
+                    
+                    var excelCell = worksheet.Cell(excelRow, col + 1);
+                    SetCellValue(excelCell, cellValue, columnName);
                 }
 
-                // Apply borders
-                var dataRange = worksheet.Range(excelRow, 1, excelRow, headers.Length);
+                // Apply row borders (legacy VB6 style)
+                var dataRange = worksheet.Range(excelRow, 1, excelRow, columnNames.Count);
                 dataRange.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
             }
 
-            // Format date columns
-            var dateColumn = worksheet.Column(3); // SB Date column
-            var dateFormat = _configService.GetValue("EXCEL_DATE_FORMAT", "dd-mmm-yyyy");
-            dateColumn.Style.DateFormat.Format = dateFormat;
-
-            // Format number columns (right-align and add commas)
-            var numberColumns = new[] { 6, 8, 10, 11, 12, 13, 14, 32 }; // QTY, rates, values
-            var numberFormat = _configService.GetValue("EXCEL_NUMBER_FORMAT", "#,##0.00");
-            foreach (var colIndex in numberColumns)
-            {
-                var column = worksheet.Column(colIndex);
-                column.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
-                column.Style.NumberFormat.Format = numberFormat;
-            }
-
-            // Auto-fit columns
+            // Legacy VB6 style: Auto-fit columns and disable text wrapping
             worksheet.Columns().AdjustToContents();
+            
+            // Apply global text wrapping setting (disabled like legacy)
+            var allDataRange = worksheet.Range(1, 1, dataList.Count + 1, columnNames.Count);
+            allDataRange.Style.Alignment.WrapText = false;
 
-            // Create output directory if it doesn't exist
+            // Save the workbook
             var outputDir = _configService.GetOutputDirectory();
             Directory.CreateDirectory(outputDir);
 
@@ -139,6 +107,110 @@ public class ExcelExportService : IExcelExportService
 
             return filePath;
         });
+    }
+
+    /// <summary>
+    /// Formats database column names to match template headers exactly
+    /// Based on template analysis: EXDPORT_Tamplate_JNPT.xlsx and EXPORT_Tamplate.xlsx
+    /// </summary>
+    private string FormatColumnHeader(string columnName)
+    {
+        // Convert database column names to match template headers exactly
+        return columnName.ToUpper() switch
+        {
+            "SB_NO" or "BILLNO" or "BILL_NO" => "Bill No",
+            "HS_CODE" or "HSCODE" => "Hs Code", 
+            "SB_DATE" or "DATE" => "Date",
+            "PRODUCT" or "PRODUCT_NAME" => "Product",
+            "QTY" or "QUANTITY" => "Quantity",
+            "UNIT" => "Unit",
+            "UNIT_PRICE_FC" or "UNIT_PRICE" => "Unit Price in Foreign Currency",
+            "CURRENCY" or "FC" => "Currency",
+            "FOB_FC" or "FOB_VALUE_FC" => "Total FOB in Foreign Currency",
+            "FOB_INR" or "FOB_VALUE_INR" => "Total FOB in INR",
+            "UNIT_RATE_INR" => "Unit Rate INR",
+            "FOB_USD" or "FOB_VALUE_USD" => "FOB in USD",
+            "UNIT_RATE_USD" => "Unit Rate USD",
+            "FOREIGN_PORT" or "FOR_PORT" => "Foreign Port",
+            "CTRY_OF_DESTINATION" or "FOREIGN_COUNTRY" => "Foreign Country",
+            "IND_PORT" or "INDIAN_PORT" => "Indian Port",
+            "MODE_OF_SHIPMENT" => "Mode of Shipment",
+            "IEC" => "IEC",
+            "INDIAN_EXPORTER_NAME" or "EXPORTER_NAME" => "Indian Company",
+            "ADDRESS1" => "Address1",
+            "ADDRESS2" => "Address2", 
+            "CITY" => "City",
+            "PIN" or "PINCODE" => "Pin",
+            "FOREIGN_IMPORTER_NAME" or "IMPORTER_NAME" => "Foreign Company",
+            "FOREIGN_ADDRESS" => "Foreign Address",
+            "ITEM_NO" => "Item No",
+            "INVOICE_NO" => "Invoice No",
+            
+            // For any unmapped columns, use friendly formatting
+            _ => columnName.Replace("_", " ").Replace("Ctry", "Country")
+        };
+    }
+
+    /// <summary>
+    /// Sets cell value with appropriate formatting based on data type and column name
+    /// Legacy VB6 compatible formatting
+    /// </summary>
+    private void SetCellValue(IXLCell cell, object? value, string columnName)
+    {
+        if (value == null || value == DBNull.Value)
+        {
+            cell.Value = "";
+            return;
+        }
+
+        // Apply template-style font and borders to all cells
+        cell.Style.Font.FontName = "Times New Roman";
+        cell.Style.Font.FontSize = 10;
+        cell.Style.Border.TopBorder = XLBorderStyleValues.Thin;
+        cell.Style.Border.BottomBorder = XLBorderStyleValues.Thin;
+        cell.Style.Border.LeftBorder = XLBorderStyleValues.Thin;
+        cell.Style.Border.RightBorder = XLBorderStyleValues.Thin;
+        
+        // Disable text wrapping (like template)
+        cell.Style.Alignment.WrapText = false;
+
+        // Handle different data types
+        switch (value)
+        {
+            case DateTime dateValue:
+                cell.Value = dateValue;
+                // Use legacy date format: "dd-mmm-yy" 
+                cell.Style.DateFormat.Format = "dd-mmm-yy";
+                break;
+                
+            case decimal decimalValue:
+            case double doubleValue:
+            case float floatValue:
+                cell.Value = Convert.ToDecimal(value);
+                // Apply number formatting for currency and numeric fields
+                if (columnName.Contains("Rate") || columnName.Contains("Value") || 
+                    columnName.Contains("FOB") || columnName.Contains("QTY"))
+                {
+                    var numberFormat = _configService.GetValue("EXCEL_NUMBER_FORMAT", "#,##0.00");
+                    cell.Style.NumberFormat.Format = numberFormat;
+                    cell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
+                }
+                break;
+                
+            case int intValue:
+            case long longValue:
+                cell.Value = Convert.ToInt64(value);
+                if (columnName.Contains("Serial") || columnName.Contains("MonthSerial"))
+                {
+                    cell.Style.NumberFormat.Format = "0";
+                    cell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
+                }
+                break;
+                
+            default:
+                cell.Value = value.ToString();
+                break;
+        }
     }
 
     public async Task ExportToFileAsync(IEnumerable<ExportData> data, string filePath)
@@ -152,90 +224,73 @@ public class ExcelExportService : IExcelExportService
         await Task.Run(() =>
         {
             using var workbook = new XLWorkbook();
-            var worksheet = workbook.Worksheets.Add("Export Data");
+            var worksheetName = _configService.GetValue("EXCEL_WORKSHEET_NAME", "Export Data");
+            var worksheet = workbook.Worksheets.Add(worksheetName);
 
-            // Add headers
-            var headers = new[]
+            var dataList = data.ToList();
+            if (!dataList.Any())
             {
-                "SB NO", "HS4", "SB Date", "HS Code", "Product", "QTY", "Unit",
-                "Unit Rate (FC)", "Unit Rate Currency", "Value (FC)", "Total SB Value (INR Lacs)",
-                "Unit Rate (INR)", "FOB USD", "Unit Rate USD", "Port of Destination",
-                "Country of Destination", "Port of Origin", "Ship Mode", "IEC",
-                "Indian Exporter Name", "Exporter Add1", "Exporter Add2", "Exporter City",
-                "Pin", "Foreign Importer Name", "Foreign Add1", "Item No", "Invoice No",
-                "Draw Back", "CHA No", "CHA Name", "Std Qty"
-            };
-
-            // Set headers
-            for (int i = 0; i < headers.Length; i++)
-            {
-                var cell = worksheet.Cell(1, i + 1);
-                cell.Value = headers[i];
-                cell.Style.Font.Bold = true;
-                cell.Style.Fill.BackgroundColor = XLColor.LightBlue;
-                cell.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+                // If no data, create empty worksheet with message
+                worksheet.Cell(1, 1).Value = "No data available for export";
+                workbook.SaveAs(filePath);
+                return;
             }
 
-            // Add data
-            var dataList = data.ToList();
+            // Get column names dynamically from the first record
+            var firstRecord = dataList.First();
+            var columnNames = firstRecord.GetColumnNames().ToList();
+
+            // Set headers with exact template styling (Accent1 background, like templates)
+            for (int i = 0; i < columnNames.Count; i++)
+            {
+                var cell = worksheet.Cell(1, i + 1);
+                cell.Value = FormatColumnHeader(columnNames[i]);
+                
+                // Apply exact template formatting (Times New Roman, Bold, Accent1 background)
+                cell.Style.Font.FontName = "Times New Roman";
+                cell.Style.Font.FontSize = 10;
+                cell.Style.Font.Bold = true;
+                cell.Style.Border.TopBorder = XLBorderStyleValues.Thin;
+                cell.Style.Border.BottomBorder = XLBorderStyleValues.Thin;
+                cell.Style.Border.LeftBorder = XLBorderStyleValues.Thin;
+                cell.Style.Border.RightBorder = XLBorderStyleValues.Thin;
+                // Template uses Accent1 color theme (light blue background)
+                cell.Style.Fill.BackgroundColor = XLColor.FromTheme(XLThemeColor.Accent1, 0.5);
+                cell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                cell.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+                cell.Style.Alignment.WrapText = false;
+            }
+
+            // Add data dynamically
             for (int row = 0; row < dataList.Count; row++)
             {
                 var item = dataList[row];
-                var rowIndex = row + 2; // Start from row 2 (after headers)
+                var excelRow = row + 2; // Start from row 2 (after header)
 
-                worksheet.Cell(rowIndex, 1).Value = item.SB_NO;
-                worksheet.Cell(rowIndex, 2).Value = item.HS4;
-                worksheet.Cell(rowIndex, 3).Value = item.SB_Date;
-                worksheet.Cell(rowIndex, 4).Value = item.HS_Code;
-                worksheet.Cell(rowIndex, 5).Value = item.Product;
-                worksheet.Cell(rowIndex, 6).Value = item.QTY;
-                worksheet.Cell(rowIndex, 7).Value = item.Unit;
-                worksheet.Cell(rowIndex, 8).Value = item.UnitRateInForeignCurrency;
-                worksheet.Cell(rowIndex, 9).Value = item.UnitRateCurrency;
-                worksheet.Cell(rowIndex, 10).Value = item.ValueInFC;
-                worksheet.Cell(rowIndex, 11).Value = item.TotalSBValueInINRInLacs;
-                worksheet.Cell(rowIndex, 12).Value = item.UnitRateINR;
-                worksheet.Cell(rowIndex, 13).Value = item.FOB_USD;
-                worksheet.Cell(rowIndex, 14).Value = item.Unit_Rate_USD;
-                worksheet.Cell(rowIndex, 15).Value = item.PortOfDestination;
-                worksheet.Cell(rowIndex, 16).Value = item.CtryOfDestination;
-                worksheet.Cell(rowIndex, 17).Value = item.PortOfOrigin;
-                worksheet.Cell(rowIndex, 18).Value = item.Ship_Mode;
-                worksheet.Cell(rowIndex, 19).Value = item.IEC;
-                worksheet.Cell(rowIndex, 20).Value = item.IndianExporterName;
-                worksheet.Cell(rowIndex, 21).Value = item.ExporterAdd1;
-                worksheet.Cell(rowIndex, 22).Value = item.ExporterAdd2;
-                worksheet.Cell(rowIndex, 23).Value = item.ExporterCity;
-                worksheet.Cell(rowIndex, 24).Value = item.Pin;
-                worksheet.Cell(rowIndex, 25).Value = item.ForeignImporterName;
-                worksheet.Cell(rowIndex, 26).Value = item.FOR_Add1;
-                worksheet.Cell(rowIndex, 27).Value = item.Item_no;
-                worksheet.Cell(rowIndex, 28).Value = item.Invoice_no;
-                worksheet.Cell(rowIndex, 29).Value = item.DRAW_BACK;
-                worksheet.Cell(rowIndex, 30).Value = item.CHA_NO;
-                worksheet.Cell(rowIndex, 31).Value = item.CHA_NAME;
-                worksheet.Cell(rowIndex, 32).Value = item.std_qty;
+                for (int col = 0; col < columnNames.Count; col++)
+                {
+                    var columnName = columnNames[col];
+                    var cellValue = item.GetValue<object>(columnName);
+                    
+                    var excelCell = worksheet.Cell(excelRow, col + 1);
+                    SetCellValue(excelCell, cellValue, columnName);
+                }
+
+                // Apply row borders (legacy VB6 style)
+                var dataRange = worksheet.Range(excelRow, 1, excelRow, columnNames.Count);
+                dataRange.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
             }
 
-            // Format date column
-            var dateColumn = worksheet.Column(3); // SB Date column
-            dateColumn.Style.DateFormat.Format = "dd-mmm-yyyy";
-
-            // Format number columns (right-align and add commas)
-            var numberColumns = new[] { 6, 8, 10, 11, 12, 13, 14, 32 }; // QTY, rates, values
-            foreach (var colIndex in numberColumns)
-            {
-                var column = worksheet.Column(colIndex);
-                column.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
-                column.Style.NumberFormat.Format = "#,##0.00";
-            }
-
-            // Auto-fit columns
+            // Legacy VB6 style: Auto-fit columns and disable text wrapping
             worksheet.Columns().AdjustToContents();
+            
+            // Apply global text wrapping setting (disabled like legacy)
+            var allDataRange = worksheet.Range(1, 1, dataList.Count + 1, columnNames.Count);
+            allDataRange.Style.Alignment.WrapText = false;
 
             // Ensure directory exists
             var directory = Path.GetDirectoryName(filePath);
-            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+            if (!string.IsNullOrEmpty(directory))
             {
                 Directory.CreateDirectory(directory);
             }
@@ -249,8 +304,77 @@ public class ExcelExportService : IExcelExportService
         return value.ToString("C2"); // Currency format with 2 decimal places
     }
 
+    /// <summary>
+    /// Generates filename using legacy VB6 pattern based on filters
+    /// Legacy pattern: HSCode_Product_IEC_Exporter_Country_ForName_Port_MonthRange
+    /// </summary>
     public string GenerateFileName()
     {
-        return $"TradeData_Export_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
+        var currentDate = DateTime.Now;
+        var monthAbbr = GetMonthAbbreviation(currentDate.Month);
+        var year = currentDate.ToString("yy");
+        
+        // Build filename like legacy VB6: filter values + month + "EXP"
+        var fileName = new List<string>();
+        
+        // Add filter components (these would come from user selections in real implementation)
+        var hsCode = _configService.GetValue("FILENAME_HSCODE", "");
+        var product = _configService.GetValue("FILENAME_PRODUCT", "");
+        var iec = _configService.GetValue("FILENAME_IEC", "");
+        var exporter = _configService.GetValue("FILENAME_EXPORTER", "");
+        var country = _configService.GetValue("FILENAME_COUNTRY", "");
+        var forName = _configService.GetValue("FILENAME_FORNAME", "");
+        var port = _configService.GetValue("FILENAME_PORT", "");
+        
+        // Add components that are not empty or "%"
+        if (!string.IsNullOrEmpty(hsCode) && hsCode != "%") 
+            fileName.Add(CleanForFilename(hsCode));
+        if (!string.IsNullOrEmpty(product) && product != "%") 
+            fileName.Add(CleanForFilename(product));
+        if (!string.IsNullOrEmpty(iec) && iec != "%") 
+            fileName.Add(CleanForFilename(iec));
+        if (!string.IsNullOrEmpty(exporter) && exporter != "%") 
+            fileName.Add(CleanForFilename(exporter));
+        if (!string.IsNullOrEmpty(country) && country != "%") 
+            fileName.Add(CleanForFilename(country));
+        if (!string.IsNullOrEmpty(forName) && forName != "%") 
+            fileName.Add(CleanForFilename(forName));
+        if (!string.IsNullOrEmpty(port) && port != "%") 
+            fileName.Add(CleanForFilename(port));
+        
+        // Build final filename like legacy: criteria_monthYear + "EXP"
+        var baseFileName = fileName.Any() ? string.Join("_", fileName) : "TradeData";
+        return $"{baseFileName}_{monthAbbr}{year}EXP.xlsx";
+    }
+    
+    /// <summary>
+    /// Cleans filename component like legacy VB6 Replace(text, " ", "_")
+    /// </summary>
+    private string CleanForFilename(string text)
+    {
+        return text.Replace(" ", "_").Replace("&", "and").Replace("/", "_");
+    }
+
+    /// <summary>
+    /// Gets month abbreviation exactly like legacy VB6 code (UPPERCASE)
+    /// </summary>
+    private string GetMonthAbbreviation(int month)
+    {
+        return month switch
+        {
+            1 => "JAN",
+            2 => "FEB", 
+            3 => "MAR",
+            4 => "APR",
+            5 => "MAY",
+            6 => "JUN",
+            7 => "JUL",
+            8 => "AUG",
+            9 => "SEP",
+            10 => "OCT",
+            11 => "NOV",
+            12 => "DEC",
+            _ => "UNK"
+        };
     }
 }
