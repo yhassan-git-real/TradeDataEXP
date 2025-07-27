@@ -36,15 +36,13 @@ namespace TradeDataEXP.Services
 
         private void LoadConfiguration(string configPath)
         {
+            if (!File.Exists(configPath))
+            {
+                throw new FileNotFoundException($"Configuration file not found at: {configPath}. Please ensure the .env file exists and contains all required settings.");
+            }
+
             try
             {
-                if (!File.Exists(configPath))
-                {
-                    // Configuration file not found, using default values
-                    LoadDefaultConfiguration();
-                    return;
-                }
-
                 var lines = File.ReadAllLines(configPath);
                 foreach (var line in lines)
                 {
@@ -70,64 +68,79 @@ namespace TradeDataEXP.Services
                     }
                 }
 
-                // Configuration loaded successfully
+                // Validate that all required configuration keys are present
+                ValidateRequiredConfiguration();
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!(ex is FileNotFoundException || ex is InvalidOperationException))
             {
-                // Error loading configuration, using defaults
-                LoadDefaultConfiguration();
+                throw new InvalidOperationException($"Error loading configuration from {configPath}: {ex.Message}", ex);
             }
         }
 
-        private void LoadDefaultConfiguration()
+        private void ValidateRequiredConfiguration()
         {
-            // Fallback to hardcoded values if .env file is not available
-            _config["DB_SERVER"] = "MATRIX";
-            _config["DB_NAME"] = "Raw_Process";
-            _config["DB_USER"] = "module";
-            _config["DB_PASSWORD"] = "tcs@2015";
-            _config["DB_TRUST_SERVER_CERTIFICATE"] = "true";
-            _config["DB_CONNECTION_TIMEOUT"] = "30";
-            _config["DB_VIEW_NAME"] = "EXPDATA";
-            _config["DB_SCHEMA"] = "dbo";
-            _config["STORED_PROCEDURE_NAME"] = "ExportData_New1";
-            _config["LOG_DIRECTORY"] = @"I:\TradeDataHub\TradeDataEXP\Logs";
-            _config["LOG_FILENAME_BASE"] = "TradeDataEXP_Log";
-            _config["OUTPUT_DIRECTORY"] = @"Desktop\TradeDataEXP_Exports";
-            _config["OUTPUT_USE_DESKTOP"] = "true";
-            _config["QUERY_TOP_LIMIT"] = "1000";
-            _config["QUERY_TIMEOUT"] = "300";
-            
-            // Default configuration values loaded
+            var requiredKeys = new[]
+            {
+                "DB_SERVER", "DB_NAME", "DB_USER", "DB_PASSWORD",
+                "DB_VIEW_NAME", "DB_SCHEMA", "STORED_PROCEDURE_NAME",
+                "LOG_DIRECTORY", "LOG_FILENAME_BASE", "OUTPUT_DIRECTORY",
+                "QUERY_TOP_LIMIT", "QUERY_TIMEOUT"
+            };
+
+            var missingKeys = new List<string>();
+            foreach (var key in requiredKeys)
+            {
+                if (!_config.ContainsKey(key) || string.IsNullOrWhiteSpace(_config[key]))
+                {
+                    missingKeys.Add(key);
+                }
+            }
+
+            if (missingKeys.Count > 0)
+            {
+                throw new InvalidOperationException($"Missing required configuration keys in .env file: {string.Join(", ", missingKeys)}. Please ensure all required settings are defined in the .env file.");
+            }
         }
 
         public string GetValue(string key)
         {
-            return _config.TryGetValue(key, out var value) ? value : string.Empty;
+            if (!_config.TryGetValue(key, out var value) || string.IsNullOrWhiteSpace(value))
+            {
+                throw new InvalidOperationException($"Configuration key '{key}' is missing or empty in .env file. Please add this key with a valid value.");
+            }
+            return value;
         }
 
         public string GetValue(string key, string defaultValue)
         {
-            return _config.TryGetValue(key, out var value) ? value : defaultValue;
+            return _config.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value) ? value : defaultValue;
         }
 
         public T GetValue<T>(string key)
         {
-            return GetValue<T>(key, default(T)!);
+            var value = GetValue(key); // This will throw if key is missing
+            try
+            {
+                return (T)Convert.ChangeType(value, typeof(T));
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Cannot convert configuration value '{value}' for key '{key}' to type {typeof(T).Name}. Please check the value in .env file.", ex);
+            }
         }
 
         public T GetValue<T>(string key, T defaultValue)
         {
-            if (!_config.TryGetValue(key, out var value))
+            if (!_config.TryGetValue(key, out var value) || string.IsNullOrWhiteSpace(value))
                 return defaultValue;
 
             try
             {
                 return (T)Convert.ChangeType(value, typeof(T));
             }
-            catch
+            catch (Exception ex)
             {
-                return defaultValue;
+                throw new InvalidOperationException($"Cannot convert configuration value '{value}' for key '{key}' to type {typeof(T).Name}. Please check the value in .env file.", ex);
             }
         }
 
@@ -146,7 +159,7 @@ namespace TradeDataEXP.Services
         public string GetLogFilePath()
         {
             var logDir = GetValue("LOG_DIRECTORY");
-            var baseLogFile = GetValue("LOG_FILENAME_BASE", "TradeDataEXP_Log");
+            var baseLogFile = GetValue("LOG_FILENAME_BASE");
             
             // Add current date to the filename (format: YYYYMMDD)
             var dateStamp = DateTime.Now.ToString("yyyyMMdd");
@@ -157,7 +170,7 @@ namespace TradeDataEXP.Services
 
         public string GetOutputDirectory()
         {
-            var outputDir = GetValue("OUTPUT_DIRECTORY", @"Desktop\TradeDataEXP_Exports");
+            var outputDir = GetValue("OUTPUT_DIRECTORY");
             var useDesktop = GetValue<bool>("OUTPUT_USE_DESKTOP", true);
             
             if (useDesktop && outputDir.StartsWith("Desktop"))
@@ -172,24 +185,24 @@ namespace TradeDataEXP.Services
 
         public string GetStoredProcedureName()
         {
-            return GetValue("STORED_PROCEDURE_NAME", "ExportData_New1");
+            return GetValue("STORED_PROCEDURE_NAME");
         }
 
         public string GetViewName()
         {
-            var schema = GetValue("DB_SCHEMA", "dbo");
-            var viewName = GetValue("DB_VIEW_NAME", "EXPDATA");
+            var schema = GetValue("DB_SCHEMA");
+            var viewName = GetValue("DB_VIEW_NAME");
             return $"[{schema}].[{viewName}]";
         }
 
         public int GetQueryTimeout()
         {
-            return GetValue<int>("QUERY_TIMEOUT", 300);
+            return GetValue<int>("QUERY_TIMEOUT");
         }
 
         public int GetQueryTopLimit()
         {
-            return GetValue<int>("QUERY_TOP_LIMIT", 1000);
+            return GetValue<int>("QUERY_TOP_LIMIT");
         }
     }
 }

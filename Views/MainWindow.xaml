@@ -115,7 +115,7 @@
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="🗄️" Foreground="White" FontSize="16" Margin="0,0,8,0"/>
                         <TextBlock Text="Database:" Foreground="White" FontWeight="Medium" FontSize="13"/>
-                        <TextBlock Text="MATRIX/Raw_Process" Foreground="White" FontWeight="Bold" Margin="6,0,8,0" FontSize="13"/>
+                        <TextBlock Text="{Binding DatabaseStatus}" Foreground="White" FontWeight="Bold" Margin="6,0,8,0" FontSize="13"/>
                         <Ellipse Width="8" Height="8" Fill="#4ADE80" VerticalAlignment="Center"/>
                         <TextBlock Text="ACTIVE" Foreground="#4ADE80" FontSize="11" FontWeight="Bold" Margin="6,0,0,0"/>
                     </StackPanel>
