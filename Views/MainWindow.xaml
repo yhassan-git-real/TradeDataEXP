@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:converters="clr-namespace:TradeDataEXP.Converters"
         mc:Ignorable="d"
         Title="TradeDataEXP - Professional Export Application"
         Height="700" Width="1200"
@@ -14,10 +15,14 @@
         <SolidColorBrush x:Key="SecondaryBrush" Color="#6B73FF"/>
         <SolidColorBrush x:Key="AccentBrush" Color="#F18F01"/>
         <SolidColorBrush x:Key="SuccessBrush" Color="#10B981"/>
+        <SolidColorBrush x:Key="ErrorBrush" Color="#EF4444"/>
         <SolidColorBrush x:Key="LightBrush" Color="#F8F9FA"/>
         <SolidColorBrush x:Key="DarkBrush" Color="#2D3748"/>
         
+        <!-- Converters -->
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+        <converters:InverseBooleanToVisibilityConverter x:Key="InverseBooleanToVisibilityConverter"/>
+        <converters:InverseBooleanConverter x:Key="InverseBooleanConverter"/>
         
         <!-- Simple Input Style -->
         <Style x:Key="ModernInputStyle" TargetType="TextBox">
@@ -216,6 +221,22 @@
                                        ToolTip="Enter port of origin"/>
                             </StackPanel>
                         </Grid>
+                        
+                        <!-- Multi-Parameter Info Panel -->
+                        <Border Background="#F8F9FA" CornerRadius="6" Padding="16" Margin="0,20,0,0" 
+                                BorderBrush="#E5E7EB" BorderThickness="1">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                    <TextBlock Text="💡" FontSize="14" Margin="0,0,8,0"/>
+                                    <TextBlock Text="Multi-Parameter Export" FontSize="13" FontWeight="SemiBold" 
+                                             Foreground="{StaticResource DarkBrush}"/>
+                                </StackPanel>
+                                <TextBlock Text="Use commas to separate multiple values and generate individual files for each combination:" 
+                                         FontSize="12" Foreground="#6B7280" Margin="0,0,0,4"/>
+                                <TextBlock Text="Example: HS Code = '10,20,40' and Exporter = 'India,US' will create 6 files: 10_India, 20_India, 40_India, 10_US, 20_US, 40_US" 
+                                         FontSize="11" Foreground="#9CA3AF" FontStyle="Italic"/>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
                 </Border>
 
@@ -232,28 +253,68 @@
                             <Border Background="{StaticResource AccentBrush}" CornerRadius="8" Padding="8" Margin="0,0,12,0">
                                 <TextBlock Text="📤" FontSize="16" Foreground="White"/>
                             </Border>
-                            <TextBlock Text="Ready to Export Trade Data" FontSize="16" FontWeight="SemiBold" 
-                                     Foreground="{StaticResource DarkBrush}" VerticalAlignment="Center"/>
+                            <StackPanel>
+                                <TextBlock Text="Ready to Export Trade Data" FontSize="16" FontWeight="SemiBold" 
+                                         Foreground="{StaticResource DarkBrush}" VerticalAlignment="Center"
+                                         Visibility="{Binding IsAnyOperationInProgress, Converter={StaticResource InverseBooleanToVisibilityConverter}}"/>
+                                <TextBlock Text="{Binding CurrentOperationType}" FontSize="16" FontWeight="SemiBold" 
+                                         Foreground="{StaticResource DarkBrush}" VerticalAlignment="Center"
+                                         Visibility="{Binding IsAnyOperationInProgress, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                                <TextBlock Text="Select your export type and parameters" FontSize="12" 
+                                         Foreground="{StaticResource SecondaryBrush}" FontWeight="Medium"
+                                         Visibility="{Binding IsAnyOperationInProgress, Converter={StaticResource InverseBooleanToVisibilityConverter}}"/>
+                                <TextBlock Text="Operation in progress" FontSize="12" 
+                                         Foreground="{StaticResource ErrorBrush}" FontWeight="Medium"
+                                         Visibility="{Binding IsAnyOperationInProgress, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                            </StackPanel>
                         </StackPanel>
 
                         <StackPanel Grid.Column="1" Orientation="Horizontal">
+                            <!-- Permanent Cancel Button (always visible) -->
+                            <Button Command="{Binding CancelOperationCommand}" 
+                                    Background="{StaticResource ErrorBrush}" Foreground="White"
+                                    Width="130" Height="40" Margin="0,0,12,0"
+                                    Style="{StaticResource ModernButtonStyle}"
+                                    ToolTip="Cancel any running operation or reset stuck states">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="⏹️" FontSize="14" Margin="0,0,6,0"/>
+                                    <TextBlock Text="Cancel" FontSize="13" FontWeight="Medium"/>
+                                </StackPanel>
+                            </Button>
+
+                            <!-- Reset Button (always visible) -->
                             <Button Command="{Binding ResetCommand}" 
                                     Background="{StaticResource SecondaryBrush}" Foreground="White"
                                     Width="110" Height="40" Margin="0,0,12,0"
-                                    Style="{StaticResource ModernButtonStyle}">
+                                    Style="{StaticResource ModernButtonStyle}"
+                                    IsEnabled="{Binding IsAnyOperationInProgress, Converter={StaticResource InverseBooleanConverter}}">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="🔄" FontSize="14" Margin="0,0,6,0"/>
                                     <TextBlock Text="Reset" FontSize="13" FontWeight="Medium"/>
                                 </StackPanel>
                             </Button>
 
+                            <!-- Export Buttons (disabled during operations) -->
                             <Button Command="{Binding DownloadExcelCommand}" 
                                     Background="{StaticResource SuccessBrush}" Foreground="White"
-                                    Width="140" Height="40"
-                                    Style="{StaticResource ModernButtonStyle}">
+                                    Width="140" Height="40" Margin="0,0,12,0"
+                                    Style="{StaticResource ModernButtonStyle}"
+                                    IsEnabled="{Binding IsAnyOperationInProgress, Converter={StaticResource InverseBooleanConverter}}">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="📊" FontSize="14" Margin="0,0,6,0"/>
                                     <TextBlock Text="Export Excel" FontSize="13" FontWeight="Medium"/>
+                                </StackPanel>
+                            </Button>
+
+                            <Button Command="{Binding DownloadMultipleExcelCommand}" 
+                                    Background="{StaticResource PrimaryBrush}" Foreground="White"
+                                    Width="160" Height="40"
+                                    Style="{StaticResource ModernButtonStyle}"
+                                    ToolTip="Export multiple files based on comma-separated parameters (e.g., HS Code: 10,20,40)"
+                                    IsEnabled="{Binding IsAnyOperationInProgress, Converter={StaticResource InverseBooleanConverter}}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="📚" FontSize="14" Margin="0,0,6,0"/>
+                                    <TextBlock Text="Multi-Export" FontSize="13" FontWeight="Medium"/>
                                 </StackPanel>
                             </Button>
                         </StackPanel>
@@ -292,6 +353,112 @@
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="🗑️" FontSize="13" Margin="0,0,5,0"/>
                                 <TextBlock Text="Clear" FontSize="12" FontWeight="Medium"/>
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+                </Border>
+
+                <!-- Enhanced Multi-Export Progress Panel -->
+                <Border Background="White" CornerRadius="8" Padding="24" Margin="0,0,0,20" 
+                        BorderBrush="#E5E7EB" BorderThickness="1"
+                        Visibility="{Binding IsMultiExportInProgress, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        
+                        <!-- Header with Cancel Button -->
+                        <Grid Grid.Row="0" Margin="0,0,0,16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            
+                            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                <Border Background="{StaticResource PrimaryBrush}" CornerRadius="8" Padding="8" Margin="0,0,12,0">
+                                    <TextBlock Text="⚡" FontSize="16" Foreground="White"/>
+                                </Border>
+                                <TextBlock Text="{Binding CurrentOperationType}" FontSize="16" FontWeight="SemiBold" 
+                                         Foreground="{StaticResource DarkBrush}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                            
+                            <Button Grid.Column="2" Command="{Binding CancelOperationCommand}" 
+                                    Background="{StaticResource ErrorBrush}" Foreground="White"
+                                    Width="120" Height="36"
+                                    Style="{StaticResource ModernButtonStyle}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="⏹️" FontSize="13" Margin="0,0,6,0"/>
+                                    <TextBlock Text="Cancel" FontSize="13" FontWeight="Medium"/>
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+                        
+                        <!-- Progress Bar -->
+                        <Grid Grid.Row="1" Margin="0,0,0,12">
+                            <ProgressBar Value="{Binding MultiExportProgress}" Maximum="100" Height="8" 
+                                       Background="{StaticResource LightBrush}" 
+                                       Foreground="{StaticResource SuccessBrush}"/>
+                            <TextBlock Text="{Binding MultiExportProgress, StringFormat={}{0}%}" 
+                                     HorizontalAlignment="Center" VerticalAlignment="Center" 
+                                     FontSize="12" FontWeight="SemiBold" 
+                                     Foreground="{StaticResource DarkBrush}"/>
+                        </Grid>
+                        
+                        <!-- Status Information -->
+                        <Grid Grid.Row="2">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            
+                            <TextBlock Grid.Row="0" Text="{Binding MultiExportStatus}" 
+                                     FontSize="14" FontWeight="Medium" 
+                                     Foreground="{StaticResource DarkBrush}" 
+                                     Margin="0,0,0,4"/>
+                            <TextBlock Grid.Row="1" Text="{Binding MultiExportDetails}" 
+                                     FontSize="12" 
+                                     Foreground="{StaticResource SecondaryBrush}"/>
+                        </Grid>
+                    </Grid>
+                </Border>
+
+                <!-- Single Export Progress Panel -->
+                <Border Background="White" CornerRadius="8" Padding="24" Margin="0,0,0,20" 
+                        BorderBrush="#E5E7EB" BorderThickness="1"
+                        Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Border Background="{StaticResource SuccessBrush}" CornerRadius="8" Padding="8" Margin="0,0,12,0">
+                                <TextBlock Text="📊" FontSize="16" Foreground="White"/>
+                            </Border>
+                            <StackPanel>
+                                <TextBlock Text="{Binding CurrentOperationType}" FontSize="16" FontWeight="SemiBold" 
+                                         Foreground="{StaticResource DarkBrush}"/>
+                                <TextBlock Text="Processing your export request..." FontSize="12" 
+                                         Foreground="{StaticResource SecondaryBrush}"/>
+                            </StackPanel>
+                        </StackPanel>
+                        
+                        <ProgressBar Grid.Column="1" IsIndeterminate="True" Height="6" Margin="20,0,20,0"
+                                   Background="{StaticResource LightBrush}" 
+                                   Foreground="{StaticResource SuccessBrush}"/>
+                        
+                        <Button Grid.Column="2" Command="{Binding CancelOperationCommand}" 
+                                Background="{StaticResource ErrorBrush}" Foreground="White"
+                                Width="120" Height="36"
+                                Style="{StaticResource ModernButtonStyle}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="⏹️" FontSize="13" Margin="0,0,6,0"/>
+                                <TextBlock Text="Cancel" FontSize="13" FontWeight="Medium"/>
                             </StackPanel>
                         </Button>
                     </Grid>

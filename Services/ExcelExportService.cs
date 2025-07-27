@@ -270,7 +270,7 @@ public class ExcelExportService : IExcelExportService
     }
 
     /// <summary>
-    /// Generates filename using legacy VB6 pattern based on filters
+    /// Generates filename using standard pattern based on filters
     /// </summary>
     public string GenerateFileName()
     {
