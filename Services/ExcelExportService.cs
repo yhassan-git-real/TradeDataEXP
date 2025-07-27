@@ -59,7 +59,8 @@ public class ExcelExportService : IExcelExportService
                 cell.Style.Border.BottomBorder = XLBorderStyleValues.Thin;
                 cell.Style.Border.LeftBorder = XLBorderStyleValues.Thin;
                 cell.Style.Border.RightBorder = XLBorderStyleValues.Thin;
-                cell.Style.Fill.BackgroundColor = XLColor.FromTheme(XLThemeColor.Accent1, 0.5);
+                // Set background color to Blue Accent1 (RGB: 79, 129, 189 | HEX: #4F81BD)
+                cell.Style.Fill.BackgroundColor = XLColor.FromArgb(79, 129, 189);
                 cell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
                 cell.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
                 cell.Style.Alignment.WrapText = false;
@@ -225,7 +226,8 @@ public class ExcelExportService : IExcelExportService
                 cell.Style.Border.BottomBorder = XLBorderStyleValues.Thin;
                 cell.Style.Border.LeftBorder = XLBorderStyleValues.Thin;
                 cell.Style.Border.RightBorder = XLBorderStyleValues.Thin;
-                cell.Style.Fill.BackgroundColor = XLColor.FromTheme(XLThemeColor.Accent1, 0.5);
+                // Set background color to Blue Accent1 (RGB: 79, 129, 189 | HEX: #4F81BD)
+                cell.Style.Fill.BackgroundColor = XLColor.FromArgb(79, 129, 189);
                 cell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
                 cell.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
                 cell.Style.Alignment.WrapText = false;

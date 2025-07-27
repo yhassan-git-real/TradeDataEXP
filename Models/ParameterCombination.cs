@@ -12,7 +12,7 @@ public class ParameterCombination
     public string HsCode { get; set; } = "%";
     public string Product { get; set; } = "%";
     public string Exporter { get; set; } = "%";
-    public string Port { get; set; } = "%";
+    public string IndianPort { get; set; } = "%";
     public string IecCode { get; set; } = "%";
     public string ForeignCountry { get; set; } = "%";
     public string ForeignParty { get; set; } = "%";
@@ -29,7 +29,7 @@ public class ParameterCombination
             HsCode = HsCode,
             Product = Product,
             ExporterName = Exporter,
-            Port = Port,
+            IndianPort = IndianPort,
             Iec = IecCode,
             ForeignCountry = ForeignCountry,
             ForeignParty = ForeignParty,
@@ -48,7 +48,7 @@ public class ParameterCombination
         if (HsCode != "%") parts.Add(CleanForFilename(HsCode));
         if (Product != "%") parts.Add(CleanForFilename(Product));
         if (Exporter != "%") parts.Add(CleanForFilename(Exporter));
-        if (Port != "%") parts.Add(CleanForFilename(Port));
+        if (IndianPort != "%") parts.Add(CleanForFilename(IndianPort));
         if (IecCode != "%") parts.Add(CleanForFilename(IecCode));
         if (ForeignCountry != "%") parts.Add(CleanForFilename(ForeignCountry));
         if (ForeignParty != "%") parts.Add(CleanForFilename(ForeignParty));
@@ -86,11 +86,11 @@ public class ParameterCombination
         
         if (fromSerial == toSerial)
         {
-            return $"{fromMonthAbbr}{fromYear:00}";
+            return $"{fromMonthAbbr}{fromYear % 100:00}";
         }
         else
         {
-            return $"{fromMonthAbbr}{fromYear:00}-{toMonthAbbr}{toYear:00}";
+            return $"{fromMonthAbbr}{fromYear % 100:00}-{toMonthAbbr}{toYear % 100:00}";
         }
     }
     
@@ -124,7 +124,7 @@ public class ParameterCombination
         if (HsCode != "%") parts.Add($"HS:{HsCode}");
         if (Product != "%") parts.Add($"Product:{Product}");
         if (Exporter != "%") parts.Add($"Exporter:{Exporter}");
-        if (Port != "%") parts.Add($"Port:{Port}");
+        if (IndianPort != "%") parts.Add($"IndianPort:{IndianPort}");
         if (IecCode != "%") parts.Add($"IEC:{IecCode}");
         if (ForeignCountry != "%") parts.Add($"Country:{ForeignCountry}");
         if (ForeignParty != "%") parts.Add($"Party:{ForeignParty}");

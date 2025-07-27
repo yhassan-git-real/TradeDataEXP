@@ -169,7 +169,7 @@ namespace TradeDataEXP.Services
 
                 // Convert to ExportParameters for database query
                 var exportParams = combination.ToExportParameters();
-                _enhancedLoggingService.LogMultiExport($"🔍 Converted to export parameters: HsCode={exportParams.HsCode}, Product={exportParams.Product}, Exporter={exportParams.ExporterName}, IEC={exportParams.Iec}, ForeignParty={exportParams.ForeignParty}, ForeignCountry={exportParams.ForeignCountry}, Port={exportParams.Port}, FromMonth={exportParams.FromMonthSerial}, ToMonth={exportParams.ToMonthSerial}");
+                _enhancedLoggingService.LogMultiExport($"🔍 Converted to export parameters: HsCode={exportParams.HsCode}, Product={exportParams.Product}, Exporter={exportParams.ExporterName}, IEC={exportParams.Iec}, ForeignParty={exportParams.ForeignParty}, ForeignCountry={exportParams.ForeignCountry}, IndianPort={exportParams.IndianPort}, FromMonth={exportParams.FromMonthSerial}, ToMonth={exportParams.ToMonthSerial}");
                 
                 // Log database query with full details
                                 // Execute stored procedure first
@@ -205,7 +205,7 @@ namespace TradeDataEXP.Services
                         FileName = combination.GenerateFileName(),
                         Parameters = combination,
                         IsSuccess = false,
-                        ErrorMessage = $"No data available for combination: HS:{combination.HsCode}, Product:{combination.Product}, Exporter:{combination.Exporter}, IEC:{combination.IecCode}, ForeignParty:{combination.ForeignParty}, ForeignCountry:{combination.ForeignCountry}, Port:{combination.Port}. This is normal - skipped to next combination.",
+                        ErrorMessage = $"No data available for combination: HS:{combination.HsCode}, Product:{combination.Product}, Exporter:{combination.Exporter}, IEC:{combination.IecCode}, ForeignParty:{combination.ForeignParty}, ForeignCountry:{combination.ForeignCountry}, IndianPort:{combination.IndianPort}. This is normal - skipped to next combination.",
                         ProcessingTime = DateTime.Now - startTime,
                         RecordCount = 0,
                         IsDataUnavailable = true  // Flag to indicate this is data unavailability, not a processing error
@@ -328,7 +328,7 @@ namespace TradeDataEXP.Services
                        HsCode = hsCode,
                        Product = product,
                        Exporter = exporter,
-                       Port = port,
+                       IndianPort = port,
                        IecCode = iecCode,
                        ForeignCountry = foreignCountry,
                        ForeignParty = foreignParty,

@@ -129,12 +129,15 @@ public partial class MainViewModel : ObservableObject
         if (!ValidateInputs())
             return;
 
+        var operationType = "Single Export";
+        var operationStartTime = DateTime.Now;
+
         try
         {
             // Log all user input parameters for single export
             _enhancedLoggingService.LogSingleExportParameters(
                 Parameters.HsCode, Parameters.Product, Parameters.ExporterName, Parameters.Iec,
-                Parameters.ForeignParty, Parameters.ForeignCountry, Parameters.Port, 
+                Parameters.ForeignParty, Parameters.ForeignCountry, Parameters.IndianPort, 
                 Parameters.FromMonthSerial, Parameters.ToMonthSerial);
 
             // Create new cancellation token for this operation
@@ -145,12 +148,16 @@ public partial class MainViewModel : ObservableObject
             IsLoading = true;
             IsAnyOperationInProgress = true;
             CanCancelOperation = true;
-            CurrentOperationType = "Single Export";
+            CurrentOperationType = operationType;
             StatusMessage = "Executing stored procedure...";
 
-            // Execute the stored procedure with cancellation support
+            // Start overall operation timing
             _enhancedLoggingService.LogSingleExport("🚀 Starting single export operation with cancellation support");
+
+            // Step 1: Execute stored procedure
+            _enhancedLoggingService.StartStepTiming(operationType, "Database Stored Procedure");
             await _databaseService.ExecuteExportDataStoredProcedureAsync(Parameters);
+            _enhancedLoggingService.EndStepTiming(operationType, "Database Stored Procedure");
 
             // Check for cancellation
             _cancellationTokenSource.Token.ThrowIfCancellationRequested();
@@ -158,8 +165,11 @@ public partial class MainViewModel : ObservableObject
             StatusMessage = "Fetching all data for export...";
             _enhancedLoggingService.LogSingleExport("📊 Fetching export data for single operation");
 
+            // Step 2: Fetch data
+            _enhancedLoggingService.StartStepTiming(operationType, "Data Retrieval");
             var data = await _databaseService.GetExportDataAsync();
             var dataList = data.ToList();
+            _enhancedLoggingService.EndStepTiming(operationType, "Data Retrieval");
             
             // Log database query result
             _enhancedLoggingService.LogDatabaseQuery("Single Export", Parameters, dataList.Count);
@@ -170,6 +180,8 @@ public partial class MainViewModel : ObservableObject
             if (!dataList.Any())
             {
                 _enhancedLoggingService.LogSingleExport("❌ No data found for the specified criteria");
+                var totalTime = DateTime.Now - operationStartTime;
+                _enhancedLoggingService.LogOperationTotalTime(operationType, totalTime, true);
                 MessageBox.Show("No data found for the specified criteria.", "No Data", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
@@ -177,18 +189,28 @@ public partial class MainViewModel : ObservableObject
             StatusMessage = "Generating Excel file...";
             _enhancedLoggingService.LogSingleExport($"📄 Generating Excel file for {dataList.Count} records");
 
+            // Step 3: Generate filename
+            _enhancedLoggingService.StartStepTiming(operationType, "Filename Generation");
             var fileName = GenerateFileName();
+            _enhancedLoggingService.EndStepTiming(operationType, "Filename Generation");
 
             // Check for cancellation before file creation
             _cancellationTokenSource.Token.ThrowIfCancellationRequested();
 
+            // Step 4: Excel file creation
+            _enhancedLoggingService.StartStepTiming(operationType, "Excel File Creation");
             var filePath = await _excelExportService.ExportToExcelAsync(dataList, fileName);
+            _enhancedLoggingService.EndStepTiming(operationType, "Excel File Creation");
 
             // Check for cancellation
             _cancellationTokenSource.Token.ThrowIfCancellationRequested();
 
             StatusMessage = $"Excel exported: {dataList.Count} records";
+            
+            // Calculate and log total operation time
+            var operationTotalTime = DateTime.Now - operationStartTime;
             _enhancedLoggingService.LogSingleExport($"✅ Single export completed successfully: {dataList.Count} records exported to {filePath}");
+            _enhancedLoggingService.LogOperationTotalTime(operationType, operationTotalTime, true);
             
             var result = MessageBox.Show($"Excel file exported successfully!\n\nFile: {filePath}\n\nRecords: {dataList.Count:N0}\n\nWould you like to open the file?", 
                 "Export Successful", MessageBoxButton.YesNo, MessageBoxImage.Information);
@@ -204,14 +226,20 @@ public partial class MainViewModel : ObservableObject
         }
         catch (OperationCanceledException)
         {
+            var cancelledTime = DateTime.Now - operationStartTime;
             StatusMessage = "Single export was cancelled";
+            _enhancedLoggingService.LogSingleExport("⏹️ Single export operation was cancelled by user");
+            _enhancedLoggingService.LogOperationTotalTime(operationType, cancelledTime, true);
             TradeDataEXP.App.LogMessage("⏹️ Single export operation was cancelled by user");
             MessageBox.Show("Single export operation was cancelled.", "Export Cancelled", 
                 MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)
         {
+            var errorTime = DateTime.Now - operationStartTime;
             _enhancedLoggingService.LogError("Single export operation failed", ex);
+            _enhancedLoggingService.LogSingleExport($"❌ Single export failed: {ex.Message}");
+            _enhancedLoggingService.LogOperationTotalTime(operationType, errorTime, true);
             StatusMessage = $"Error: {ex.Message}";
             TradeDataEXP.App.LogMessage($"❌ Single export failed: {ex.Message}");
             MessageBox.Show($"Error exporting to Excel: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
@@ -263,12 +291,15 @@ public partial class MainViewModel : ObservableObject
         if (!ValidateInputs())
             return;
 
+        var operationType = "Multi-Export";
+        var operationStartTime = DateTime.Now;
+
         try
         {
             // Log all user input parameters for multi export
             _enhancedLoggingService.LogMultiExportParameters(
                 Parameters.HsCode, Parameters.Product, Parameters.ExporterName, Parameters.Iec,
-                Parameters.ForeignParty, Parameters.ForeignCountry, Parameters.Port, 
+                Parameters.ForeignParty, Parameters.ForeignCountry, Parameters.IndianPort, 
                 Parameters.FromMonthSerial, Parameters.ToMonthSerial);
 
             // Create new cancellation token for this operation
@@ -280,19 +311,22 @@ public partial class MainViewModel : ObservableObject
             IsAnyOperationInProgress = true;
             CanCancelMultiExport = true;
             CanCancelOperation = true;
-            CurrentOperationType = "Multi-Export";
+            CurrentOperationType = operationType;
             StatusMessage = "Initializing multi-parameter export...";
             MultiExportStatus = "Calculating combinations...";
             MultiExportProgress = 0;
 
             _enhancedLoggingService.LogMultiExport("🚀 Starting enhanced multi-parameter export with cancellation support");
 
+            // Step 1: Generate combinations
+            _enhancedLoggingService.StartStepTiming(operationType, "Generate Parameter Combinations");
             var multiRequest = MultiParameterRequest.FromExportParameters(Parameters);
             
             // Log all generated combinations
             var allCombinations = GenerateAllCombinationsForLogging(multiRequest);
             _enhancedLoggingService.LogAllCombinations(allCombinations);
             var totalCombinations = multiRequest.TotalCombinations;
+            _enhancedLoggingService.EndStepTiming(operationType, "Generate Parameter Combinations");
 
             if (totalCombinations > 100)
             {
@@ -307,13 +341,17 @@ public partial class MainViewModel : ObservableObject
                 if (confirmResult != MessageBoxResult.Yes)
                 {
                     StatusMessage = "Multi-parameter export cancelled";
+                    var cancelledTime = DateTime.Now - operationStartTime;
+                    _enhancedLoggingService.LogOperationTotalTime(operationType, cancelledTime, false);
                     return;
                 }
             }
 
-            // Get output directory from config
+            // Step 2: Setup output directory
+            _enhancedLoggingService.StartStepTiming(operationType, "Setup Output Directory");
             var outputDir = _configService.GetValue("OUTPUT_DIRECTORY", Environment.GetFolderPath(Environment.SpecialFolder.Desktop));
             Directory.CreateDirectory(outputDir);
+            _enhancedLoggingService.EndStepTiming(operationType, "Setup Output Directory");
 
             MultiExportStatus = $"Processing {totalCombinations} combinations...";
             MultiExportDetails = $"Using enhanced parallel processing • Concurrency: {_enhancedMultiParameterService.CalculateOptimalConcurrency(totalCombinations)}";
@@ -338,12 +376,14 @@ public partial class MainViewModel : ObservableObject
                 StatusMessage = $"Processing: {progressInfo.ProgressPercentage:F1}% complete";
             });
 
-            // Execute enhanced multi-parameter export
+            // Step 3: Execute enhanced multi-parameter export
+            _enhancedLoggingService.StartStepTiming(operationType, "Multi-Parameter Processing");
             var result = await _enhancedMultiParameterService.ProcessMultipleParametersAsync(
                 multiRequest, 
                 outputDir, 
                 progress, 
                 _cancellationTokenSource.Token);
+            _enhancedLoggingService.EndStepTiming(operationType, "Multi-Parameter Processing");
 
             // Update final status
             MultiExportProgress = 100;
@@ -352,6 +392,11 @@ public partial class MainViewModel : ObservableObject
             MultiExportDetails = $"Total time: {result.ProcessingTime:hh\\:mm\\:ss} • " +
                                $"Success rate: {result.SuccessRate:F1}%";
 
+            // Calculate and log total operation time
+            var operationTotalTime = DateTime.Now - operationStartTime;
+            _enhancedLoggingService.LogMultiExport($"✅ Enhanced multi-parameter export completed: {result.SuccessfulExports}/{result.TotalCombinations} files successful");
+            _enhancedLoggingService.LogOperationTotalTime(operationType, operationTotalTime, false);
+            
             TradeDataEXP.App.LogMessage($"✅ Enhanced multi-parameter export completed: {result.SuccessfulExports}/{result.TotalCombinations} files successful");
 
             // Show results dialog
@@ -386,16 +431,22 @@ public partial class MainViewModel : ObservableObject
         }
         catch (OperationCanceledException)
         {
+            var cancelledTime = DateTime.Now - operationStartTime;
             StatusMessage = "Multi-parameter export was cancelled";
             MultiExportStatus = "Export cancelled";
             MultiExportDetails = "Operation cancelled by user";
+            _enhancedLoggingService.LogMultiExport("⏹️ Enhanced multi-parameter export was cancelled by user");
+            _enhancedLoggingService.LogOperationTotalTime(operationType, cancelledTime, false);
             TradeDataEXP.App.LogMessage("⏹️ Enhanced multi-parameter export was cancelled by user");
             MessageBox.Show("Multi-parameter export was cancelled.", "Export Cancelled", 
                 MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)
         {
+            var errorTime = DateTime.Now - operationStartTime;
             _enhancedLoggingService.LogError("Multi-parameter export operation failed", ex);
+            _enhancedLoggingService.LogMultiExport($"❌ Enhanced multi-parameter export failed: {ex.Message}");
+            _enhancedLoggingService.LogOperationTotalTime(operationType, errorTime, false);
             StatusMessage = $"Error: {ex.Message}";
             MultiExportStatus = "Export failed";
             MultiExportDetails = ex.Message;
@@ -537,8 +588,8 @@ public partial class MainViewModel : ObservableObject
         if (!string.IsNullOrWhiteSpace(Parameters.ExporterName) && Parameters.ExporterName != "%")
             parts.Add(Parameters.ExporterName.Replace(" ", "_").Replace("%", ""));
 
-        if (!string.IsNullOrWhiteSpace(Parameters.Port) && Parameters.Port != "%")
-            parts.Add(Parameters.Port.Replace(" ", "_").Replace("%", ""));
+        if (!string.IsNullOrWhiteSpace(Parameters.IndianPort) && Parameters.IndianPort != "%")
+            parts.Add(Parameters.IndianPort.Replace(" ", "_").Replace("%", ""));
 
         // Parse month serials for date range
         int.TryParse(Parameters.FromMonthSerial, out int fromMonthSerial);
@@ -552,11 +603,11 @@ public partial class MainViewModel : ObservableObject
         string dateRange;
         if (fromMonthSerial == toMonthSerial)
         {
-            dateRange = $"{GetMonthName(fromMonth)}{fromYear:00}";
+            dateRange = $"{GetMonthName(fromMonth)}{fromYear % 100:00}";
         }
         else
         {
-            dateRange = $"{GetMonthName(fromMonth)}{fromYear:00}-{GetMonthName(toMonth)}{toYear:00}";
+            dateRange = $"{GetMonthName(fromMonth)}{fromYear % 100:00}-{GetMonthName(toMonth)}{toYear % 100:00}";
         }
 
         parts.Add(dateRange);
@@ -634,7 +685,7 @@ public partial class MainViewModel : ObservableObject
                    HsCode = hsCode,
                    Product = product,
                    Exporter = exporter,
-                   Port = port,
+                   IndianPort = port,
                    IecCode = iecCode,
                    ForeignCountry = foreignCountry,
                    ForeignParty = foreignParty,

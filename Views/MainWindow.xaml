@@ -215,10 +215,10 @@
                             </StackPanel>
 
                             <StackPanel Grid.Row="1" Grid.Column="3" Margin="8,20,8,0">
-                                <TextBlock Text="Port" FontSize="13" FontWeight="SemiBold" 
+                                <TextBlock Text="Indian Port" FontSize="13" FontWeight="SemiBold" 
                                          Foreground="{StaticResource DarkBrush}" Margin="0,0,0,8"/>
-                                <TextBox Text="{Binding Parameters.Port}" Style="{StaticResource ModernInputStyle}" 
-                                       ToolTip="Enter port of origin"/>
+                                <TextBox Text="{Binding Parameters.IndianPort}" Style="{StaticResource ModernInputStyle}" 
+                                       ToolTip="Enter Indian port of origin"/>
                             </StackPanel>
                         </Grid>
                         

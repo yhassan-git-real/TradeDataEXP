@@ -56,4 +56,19 @@ public interface IEnhancedLoggingService
     /// Log database query execution with full parameters
     /// </summary>
     void LogDatabaseQuery(string operationType, TradeDataEXP.Models.ExportParameters parameters, int recordCount);
+    
+    /// <summary>
+    /// Start timing for an operation step
+    /// </summary>
+    void StartStepTiming(string operationType, string stepName);
+    
+    /// <summary>
+    /// End timing for an operation step and log the duration
+    /// </summary>
+    void EndStepTiming(string operationType, string stepName);
+    
+    /// <summary>
+    /// Log the total operation time
+    /// </summary>
+    void LogOperationTotalTime(string operationType, TimeSpan totalTime, bool isSingleExport = true);
 }

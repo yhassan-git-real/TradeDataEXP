@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -9,6 +10,7 @@ namespace TradeDataEXP.Services;
 /// <summary>
 /// Enhanced logging service with separate log files for different operation types
 /// Provides detailed logging for single exports, multi exports, and general operations
+/// Includes performance timing for operations and steps
 /// </summary>
 public class EnhancedLoggingService : IEnhancedLoggingService
 {
@@ -22,6 +24,10 @@ public class EnhancedLoggingService : IEnhancedLoggingService
     private readonly object _generalLock = new();
     private readonly object _singleLock = new();
     private readonly object _multiLock = new();
+    
+    // Timing tracking
+    private readonly ConcurrentDictionary<string, DateTime> _stepStartTimes = new();
+    private readonly ConcurrentDictionary<string, List<(string Step, TimeSpan Duration)>> _operationTimings = new();
 
     public EnhancedLoggingService(IConfigurationService? configService = null)
     {
@@ -201,7 +207,7 @@ public class EnhancedLoggingService : IEnhancedLoggingService
         for (int i = 0; i < combList.Count; i++)
         {
             var combo = combList[i];
-            LogMultiExport($"🔄 Combination {i + 1}: HS:{combo.HsCode}, Product:{combo.Product}, Exporter:{combo.Exporter}, IEC:{combo.IecCode}, ForeignParty:{combo.ForeignParty}, ForeignCountry:{combo.ForeignCountry}, Port:{combo.Port}");
+            LogMultiExport($"🔄 Combination {i + 1}: HS:{combo.HsCode}, Product:{combo.Product}, Exporter:{combo.Exporter}, IEC:{combo.IecCode}, ForeignParty:{combo.ForeignParty}, ForeignCountry:{combo.ForeignCountry}, IndianPort:{combo.IndianPort}");
         }
         
         LogMultiExport("🔄 ================================================================");
@@ -221,7 +227,7 @@ public class EnhancedLoggingService : IEnhancedLoggingService
         logMethod($"🗄️   ExpCmp: {parameters.ExporterName}");
         logMethod($"🗄️   forcount: {parameters.ForeignCountry}");
         logMethod($"🗄️   forname: {parameters.ForeignParty}");
-        logMethod($"🗄️   port: {parameters.Port}");
+        logMethod($"🗄️   Indian Port: {parameters.IndianPort}");
         logMethod($"🗄️ Result: {recordCount} records returned");
         logMethod("🗄️ ================================================================");
     }
@@ -236,6 +242,92 @@ public class EnhancedLoggingService : IEnhancedLoggingService
         {
             // Fallback to console if file writing fails
             Console.WriteLine($"[LOG ERROR] {ex.Message}: {content}");
+        }
+    }
+
+    public void StartStepTiming(string operationType, string stepName)
+    {
+        var key = $"{operationType}_{stepName}";
+        _stepStartTimes[key] = DateTime.Now;
+        
+        // Initialize timing collection for this operation if it doesn't exist
+        _operationTimings.TryAdd(operationType, new List<(string Step, TimeSpan Duration)>());
+        
+        // Log step start
+        var logMethod = operationType.Contains("Multi") ? (Action<string>)LogMultiExport : LogSingleExport;
+        logMethod($"⏱️ Started: {stepName}");
+    }
+
+    public void EndStepTiming(string operationType, string stepName)
+    {
+        var key = $"{operationType}_{stepName}";
+        var endTime = DateTime.Now;
+        
+        if (_stepStartTimes.TryRemove(key, out var startTime))
+        {
+            var duration = endTime - startTime;
+            
+            // Add to operation timings
+            if (_operationTimings.TryGetValue(operationType, out var timings))
+            {
+                timings.Add((stepName, duration));
+            }
+            
+            // Log step completion with duration
+            var logMethod = operationType.Contains("Multi") ? (Action<string>)LogMultiExport : LogSingleExport;
+            var durationText = FormatDuration(duration);
+            logMethod($"⏱️ Completed: {stepName} - Duration: {durationText}");
+        }
+        else
+        {
+            // Step wasn't started or already ended
+            var logMethod = operationType.Contains("Multi") ? (Action<string>)LogMultiExport : LogSingleExport;
+            logMethod($"⚠️ Warning: Step '{stepName}' timing not found - may not have been started");
+        }
+    }
+
+    public void LogOperationTotalTime(string operationType, TimeSpan totalTime, bool isSingleExport = true)
+    {
+        var logMethod = isSingleExport ? (Action<string>)LogSingleExport : LogMultiExport;
+        var totalTimeText = FormatDuration(totalTime);
+        
+        logMethod($"🕒 Total operation time: {totalTimeText}");
+        
+        // Log detailed step breakdown if we have timing data
+        if (_operationTimings.TryGetValue(operationType, out var stepTimings) && stepTimings.Any())
+        {
+            logMethod("📊 Step breakdown:");
+            foreach (var (step, duration) in stepTimings)
+            {
+                var stepDurationText = FormatDuration(duration);
+                var percentage = totalTime.TotalMilliseconds > 0 ? (duration.TotalMilliseconds / totalTime.TotalMilliseconds * 100) : 0;
+                logMethod($"   • {step}: {stepDurationText} ({percentage:F1}%)");
+            }
+            
+            // Clean up timing data for this operation
+            _operationTimings.TryRemove(operationType, out _);
+        }
+        
+        logMethod("📋 ================================================================");
+    }
+
+    private static string FormatDuration(TimeSpan duration)
+    {
+        if (duration.TotalHours >= 1)
+        {
+            return $"{duration.TotalHours:F1} hours";
+        }
+        else if (duration.TotalMinutes >= 1)
+        {
+            return $"{duration.TotalMinutes:F1} minutes";
+        }
+        else if (duration.TotalSeconds >= 1)
+        {
+            return $"{duration.TotalSeconds:F1} seconds";
+        }
+        else
+        {
+            return $"{duration.TotalMilliseconds:F0} ms";
         }
     }
 }

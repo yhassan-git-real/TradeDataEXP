@@ -50,7 +50,7 @@ public class MultiParameterService : IMultiParameterService
                    HsCode = hsCode,
                    Product = product,
                    Exporter = exporter,
-                   Port = port,
+                   IndianPort = port,
                    IecCode = iec,
                    ForeignCountry = country,
                    ForeignParty = party,

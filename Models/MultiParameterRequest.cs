@@ -34,7 +34,7 @@ public class MultiParameterRequest
             HsCodes = SplitParameter(parameters.HsCode),
             Products = SplitParameter(parameters.Product),
             Exporters = SplitParameter(parameters.ExporterName),
-            Ports = SplitParameter(parameters.Port),
+            Ports = SplitParameter(parameters.IndianPort),
             IecCodes = SplitParameter(parameters.Iec),
             ForeignCountries = SplitParameter(parameters.ForeignCountry),
             ForeignParties = SplitParameter(parameters.ForeignParty),

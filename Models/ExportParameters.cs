@@ -23,7 +23,7 @@ public partial class ExportParameters : ObservableObject
     private string foreignCountry = string.Empty;
 
     [ObservableProperty]
-    private string port = string.Empty;
+    private string indianPort = string.Empty;
 
     [ObservableProperty]
     private string fromMonthSerial = string.Empty;
@@ -39,7 +39,7 @@ public partial class ExportParameters : ObservableObject
         Iec = string.Empty;
         ForeignParty = string.Empty;
         ForeignCountry = string.Empty;
-        Port = string.Empty;
+        IndianPort = string.Empty;
         FromMonthSerial = string.Empty;
         ToMonthSerial = string.Empty;
     }

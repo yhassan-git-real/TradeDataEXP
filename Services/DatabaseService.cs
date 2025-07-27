@@ -64,7 +64,7 @@ public class DatabaseService : IDatabaseService
             ExpCmp = string.IsNullOrWhiteSpace(parameters.ExporterName) ? "%" : parameters.ExporterName,
             forcount = string.IsNullOrWhiteSpace(parameters.ForeignCountry) ? "%" : parameters.ForeignCountry,
             forname = string.IsNullOrWhiteSpace(parameters.ForeignParty) ? "%" : parameters.ForeignParty,
-            port = string.IsNullOrWhiteSpace(parameters.Port) ? "%" : parameters.Port
+            port = string.IsNullOrWhiteSpace(parameters.IndianPort) ? "%" : parameters.IndianPort
         };
 
         await connection.ExecuteAsync(storedProcedure, procParameters, commandType: System.Data.CommandType.StoredProcedure, commandTimeout: 300);
@@ -175,10 +175,10 @@ public class DatabaseService : IDatabaseService
             conditions.Add($"[{columnName}] LIKE '%{SanitizeInput(parameters.ForeignCountry)}%'");
         }
 
-        if (!string.IsNullOrWhiteSpace(parameters.Port))
+        if (!string.IsNullOrWhiteSpace(parameters.IndianPort))
         {
             var columnName = _configService.GetPortOriginColumn();
-            conditions.Add($"[{columnName}] LIKE '%{SanitizeInput(parameters.Port)}%'");
+            conditions.Add($"[{columnName}] LIKE '%{SanitizeInput(parameters.IndianPort)}%'");
         }
 
         if (!string.IsNullOrWhiteSpace(parameters.FromMonthSerial))
