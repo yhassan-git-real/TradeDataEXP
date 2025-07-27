@@ -93,7 +93,7 @@ public class DatabaseService : IDatabaseService
         foreach (var row in dynamicResults)
         {
             var rowDict = (IDictionary<string, object>)row;
-            exportDataList.Add(ExportData.FromDictionary(rowDict));
+            exportDataList.Add(ExportData.FromDapper(rowDict));
         }
         
         return exportDataList;
@@ -124,7 +124,7 @@ public class DatabaseService : IDatabaseService
         foreach (var row in dynamicResults)
         {
             var rowDict = (IDictionary<string, object>)row;
-            exportDataList.Add(ExportData.FromDictionary(rowDict));
+            exportDataList.Add(ExportData.FromDapper(rowDict));
         }
         
         return exportDataList;
