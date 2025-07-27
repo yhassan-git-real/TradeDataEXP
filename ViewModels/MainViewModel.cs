@@ -53,7 +53,6 @@ public partial class MainViewModel : ObservableObject
             _databaseService = databaseService ?? new DatabaseService(_configService);
             TradeDataEXP.App.LogMessage("DatabaseService created");
             
-            // Test database connection and update status
             TestDatabaseConnection();
             
             TradeDataEXP.App.LogMessage("Database connection test initiated");
@@ -62,7 +61,6 @@ public partial class MainViewModel : ObservableObject
             _excelExportService = excelExportService ?? new ExcelExportService(_configService);
             TradeDataEXP.App.LogMessage("ExcelExportService created");
             
-            // Set default date range (current month)
             var now = DateTime.Now;
             TradeDataEXP.App.LogMessage($"Setting default date range for {now:yyyy-MM}");
             Parameters.FromMonthSerial = (now.Year * 100 + now.Month).ToString();
@@ -94,7 +92,6 @@ public partial class MainViewModel : ObservableObject
 
             StatusMessage = "Fetching all data for export...";
 
-            // Get all data
             var data = await _databaseService.GetExportDataAsync();
             var dataList = data.ToList();
 
@@ -106,10 +103,8 @@ public partial class MainViewModel : ObservableObject
 
             StatusMessage = "Generating Excel file...";
 
-            // Generate filename based on parameters
             var fileName = GenerateFileName();
 
-            // Export to Excel
             var filePath = await _excelExportService.ExportToExcelAsync(dataList, fileName);
 
             StatusMessage = $"Excel exported: {dataList.Count} records";
@@ -143,7 +138,6 @@ public partial class MainViewModel : ObservableObject
         Parameters.Clear();
         StatusMessage = "Cleared";
         
-        // Reset to current month
         var now = DateTime.Now;
         Parameters.FromMonthSerial = (now.Year * 100 + now.Month).ToString();
         Parameters.ToMonthSerial = (now.Year * 100 + now.Month).ToString();
@@ -155,7 +149,6 @@ public partial class MainViewModel : ObservableObject
         Parameters.Clear();
         StatusMessage = "Reset to defaults";
         
-        // Reset to current month
         var now = DateTime.Now;
         Parameters.FromMonthSerial = (now.Year * 100 + now.Month).ToString();
         Parameters.ToMonthSerial = (now.Year * 100 + now.Month).ToString();
@@ -167,7 +160,6 @@ public partial class MainViewModel : ObservableObject
     private void ToggleTheme()
     {
         IsDarkMode = !IsDarkMode;
-        // Theme switching will be handled in the View
     }
 
     private bool ValidateInputs()
@@ -188,7 +180,6 @@ public partial class MainViewModel : ObservableObject
             return false;
         }
 
-        // Validate month serial format (should be YYYYMM)
         if (!IsValidMonthSerial(fromMonth) || !IsValidMonthSerial(toMonth))
         {
             MessageBox.Show("Month serial must be in YYYYMM format (e.g., 202401).", "Validation Error", 
@@ -269,7 +260,8 @@ public partial class MainViewModel : ObservableObject
             TradeDataEXP.App.LogMessage("Testing real database connection...");
             
             // Actually test the database connection by executing a simple query
-            var testData = await _databaseService.GetExportDataAsync(1); // Get just 1 record to test
+            var testData = await _databaseService.GetExportDataAsync(1);
+            var testList = testData.ToList();
             
             if (testData != null && testData.Any())
             {

@@ -76,19 +76,19 @@ public class DatabaseService : IDatabaseService
         await connection.OpenAsync();
 
         var topLimit = maxRows ?? _configService.GetQueryTopLimit();
+        var useTopLimit = _configService.GetUseTopLimit();
         var viewName = _configService.GetViewName();
         var timeout = _configService.GetQueryTimeout();
         var orderByColumn = _configService.GetOrderByColumn();
 
+        var topClause = (useTopLimit && topLimit > 0) ? $"TOP {topLimit}" : "";
         var query = $@"
-            SELECT TOP {topLimit} *
+            SELECT {topClause} *
             FROM {viewName}
             ORDER BY [{orderByColumn}] DESC";
 
-        // Use dynamic query to avoid hardcoded column mapping
         var dynamicResults = await connection.QueryAsync(query, commandTimeout: timeout);
         
-        // Convert dynamic results to ExportData objects
         var exportDataList = new List<ExportData>();
         foreach (var row in dynamicResults)
         {
@@ -106,20 +106,20 @@ public class DatabaseService : IDatabaseService
 
         var whereClause = BuildWhereClause(parameters);
         var topLimit = _configService.GetQueryTopLimit();
+        var useTopLimit = _configService.GetUseTopLimit();
         var viewName = _configService.GetViewName();
         var timeout = _configService.GetQueryTimeout();
         var orderByColumn = _configService.GetOrderByColumn();
 
+        var topClause = (useTopLimit && topLimit > 0) ? $"TOP {topLimit}" : "";
         var query = $@"
-            SELECT TOP {topLimit} *
+            SELECT {topClause} *
             FROM {viewName}
             {whereClause}
             ORDER BY [{orderByColumn}] DESC";
 
-        // Use dynamic query to avoid hardcoded column mapping
         var dynamicResults = await connection.QueryAsync(query, commandTimeout: timeout);
         
-        // Convert dynamic results to ExportData objects
         var exportDataList = new List<ExportData>();
         foreach (var row in dynamicResults)
         {
@@ -128,14 +128,16 @@ public class DatabaseService : IDatabaseService
         }
         
         return exportDataList;
-    }    public string GetConnectionString()
+    }
+
+    public string GetConnectionString()
     {
         return _connectionString;
     }
 
     public string BuildWhereClause(ExportParameters parameters)
     {
-        var conditions = new List<string> { "1=1" }; // Base condition
+        var conditions = new List<string> { "1=1" };
 
         if (!string.IsNullOrWhiteSpace(parameters.HsCode))
         {
@@ -205,7 +207,6 @@ public class DatabaseService : IDatabaseService
         if (string.IsNullOrWhiteSpace(input))
             return string.Empty;
 
-        // Remove potentially dangerous characters for SQL injection
         return input.Replace("'", "''")
                    .Replace("\"", "")
                    .Replace(";", "")
