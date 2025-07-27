@@ -99,43 +99,38 @@ public class ExcelExportService : IExcelExportService
     }
 
     /// <summary>
-    /// Formats database column names to match template headers
+    /// Formats database column names to user-friendly headers using naming conventions
+    /// This method automatically converts any column name to a readable format
     /// </summary>
     private string FormatColumnHeader(string columnName)
     {
-        return columnName.ToUpper() switch
-        {
-            "SB_NO" or "BILLNO" or "BILL_NO" => "Bill No",
-            "HS_CODE" or "HSCODE" => "Hs Code", 
-            "SB_DATE" or "DATE" => "Date",
-            "PRODUCT" or "PRODUCT_NAME" => "Product",
-            "QTY" or "QUANTITY" => "Quantity",
-            "UNIT" => "Unit",
-            "UNIT_PRICE_FC" or "UNIT_PRICE" => "Unit Price in Foreign Currency",
-            "CURRENCY" or "FC" => "Currency",
-            "FOB_FC" or "FOB_VALUE_FC" => "Total FOB in Foreign Currency",
-            "FOB_INR" or "FOB_VALUE_INR" => "Total FOB in INR",
-            "UNIT_RATE_INR" => "Unit Rate INR",
-            "FOB_USD" or "FOB_VALUE_USD" => "FOB in USD",
-            "UNIT_RATE_USD" => "Unit Rate USD",
-            "FOREIGN_PORT" or "FOR_PORT" => "Foreign Port",
-            "CTRY_OF_DESTINATION" or "FOREIGN_COUNTRY" => "Foreign Country",
-            "IND_PORT" or "INDIAN_PORT" => "Indian Port",
-            "MODE_OF_SHIPMENT" => "Mode of Shipment",
-            "IEC" => "IEC",
-            "INDIAN_EXPORTER_NAME" or "EXPORTER_NAME" => "Indian Company",
-            "ADDRESS1" => "Address1",
-            "ADDRESS2" => "Address2", 
-            "CITY" => "City",
-            "PIN" or "PINCODE" => "Pin",
-            "FOREIGN_IMPORTER_NAME" or "IMPORTER_NAME" => "Foreign Company",
-            "FOREIGN_ADDRESS" => "Foreign Address",
-            "ITEM_NO" => "Item No",
-            "INVOICE_NO" => "Invoice No",
-            
-            // For any unmapped columns, use friendly formatting
-            _ => columnName.Replace("_", " ").Replace("Ctry", "Country")
-        };
+        if (string.IsNullOrWhiteSpace(columnName))
+            return columnName;
+
+        return FormatColumnNameToFriendlyText(columnName);
+    }
+
+    /// <summary>
+    /// Converts database column names to friendly display text using intelligent formatting rules
+    /// </summary>
+    private string FormatColumnNameToFriendlyText(string columnName)
+    {
+        var formatted = columnName
+            .Replace("_", " ")                    // Replace underscores with spaces
+            .Replace("Ctry", "Country")           // Common abbreviation
+            .Replace("No", "Number")              // Expand common abbreviations
+            .Replace("Qty", "Quantity")
+            .Replace("Ind", "Indian")
+            .Replace("Sb", "SB")
+            .Replace("Hs", "HS")
+            .Replace("Iec", "IEC")
+            .Replace("Fob", "FOB")
+            .Replace("Fc", "Foreign Currency")
+            .Replace("Inr", "INR")
+            .Replace("Usd", "USD");
+
+        // Convert to Title Case (first letter of each word capitalized)
+        return System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(formatted.ToLower());
     }
 
     /// <summary>
