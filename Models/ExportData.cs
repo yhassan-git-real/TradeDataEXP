@@ -1,40 +1,130 @@
 using System;
+using System.Collections.Generic;
+using System.Dynamic;
 
 namespace TradeDataEXP.Models;
 
-public class ExportData
+/// <summary>
+/// Dynamic data model that adapts to the database view schema.
+/// This avoids hardcoding column names and allows the database view to change
+/// without requiring code changes.
+/// </summary>
+public class ExportData : DynamicObject
 {
-    public string? SB_NO { get; set; }
-    public string? HS4 { get; set; }
-    public DateTime? SB_Date { get; set; }
-    public string? HS_Code { get; set; }
-    public string? Product { get; set; }
-    public decimal? QTY { get; set; }
-    public string? Unit { get; set; }
-    public decimal? UnitRateInForeignCurrency { get; set; }
-    public string? UnitRateCurrency { get; set; }
-    public decimal? ValueInFC { get; set; }
-    public decimal? TotalSBValueInINRInLacs { get; set; }
-    public decimal? UnitRateINR { get; set; }
-    public decimal? FOB_USD { get; set; }
-    public decimal? Unit_Rate_USD { get; set; }
-    public string? PortOfDestination { get; set; }
-    public string? CtryOfDestination { get; set; }
-    public string? PortOfOrigin { get; set; }
-    public string? Ship_Mode { get; set; }
-    public string? IEC { get; set; }
-    public string? IndianExporterName { get; set; }
-    public string? ExporterAdd1 { get; set; }
-    public string? ExporterAdd2 { get; set; }
-    public string? ExporterCity { get; set; }
-    public string? Pin { get; set; }
-    public string? ForeignImporterName { get; set; }
-    public string? FOR_Add1 { get; set; }
-    public string? Item_no { get; set; }
-    public string? Invoice_no { get; set; }
-    public string? DRAW_BACK { get; set; }
-    public string? CHA_NO { get; set; }
-    public string? CHA_NAME { get; set; }
-    public decimal? std_qty { get; set; }
-    public int? MonthSerial { get; set; }
+    private readonly Dictionary<string, object?> _data = new();
+
+    /// <summary>
+    /// Gets or sets values dynamically based on database column names
+    /// </summary>
+    public override bool TryGetMember(GetMemberBinder binder, out object? result)
+    {
+        return _data.TryGetValue(binder.Name, out result);
+    }
+
+    /// <summary>
+    /// Sets values dynamically based on database column names
+    /// </summary>
+    public override bool TrySetMember(SetMemberBinder binder, object? value)
+    {
+        _data[binder.Name] = value;
+        return true;
+    }
+
+    /// <summary>
+    /// Gets a value by column name with type casting
+    /// </summary>
+    public T? GetValue<T>(string columnName)
+    {
+        if (!_data.TryGetValue(columnName, out var value) || value == null)
+            return default(T);
+
+        try
+        {
+            if (typeof(T) == typeof(string))
+                return (T)(object)value.ToString()!;
+            
+            return (T)Convert.ChangeType(value, typeof(T));
+        }
+        catch
+        {
+            return default(T);
+        }
+    }
+
+    /// <summary>
+    /// Sets a value by column name
+    /// </summary>
+    public void SetValue(string columnName, object? value)
+    {
+        _data[columnName] = value;
+    }
+
+    /// <summary>
+    /// Gets a value by column name as string (safe conversion)
+    /// </summary>
+    public string? GetString(string columnName)
+    {
+        return GetValue<string>(columnName);
+    }
+
+    /// <summary>
+    /// Gets a value by column name as decimal (safe conversion)
+    /// </summary>
+    public decimal? GetDecimal(string columnName)
+    {
+        return GetValue<decimal?>(columnName);
+    }
+
+    /// <summary>
+    /// Gets a value by column name as DateTime (safe conversion)
+    /// </summary>
+    public DateTime? GetDateTime(string columnName)
+    {
+        return GetValue<DateTime?>(columnName);
+    }
+
+    /// <summary>
+    /// Gets a value by column name as integer (safe conversion)
+    /// </summary>
+    public int? GetInt(string columnName)
+    {
+        return GetValue<int?>(columnName);
+    }
+
+    /// <summary>
+    /// Checks if a column exists in the data
+    /// </summary>
+    public bool HasColumn(string columnName)
+    {
+        return _data.ContainsKey(columnName);
+    }
+
+    /// <summary>
+    /// Gets all column names available in this record
+    /// </summary>
+    public IEnumerable<string> GetColumnNames()
+    {
+        return _data.Keys;
+    }
+
+    /// <summary>
+    /// Gets all data as a dictionary for serialization or debugging
+    /// </summary>
+    public Dictionary<string, object?> GetAllData()
+    {
+        return new Dictionary<string, object?>(_data);
+    }
+
+    /// <summary>
+    /// Creates an ExportData instance from a dictionary (useful for database mapping)
+    /// </summary>
+    public static ExportData FromDictionary(IDictionary<string, object?> data)
+    {
+        var exportData = new ExportData();
+        foreach (var kvp in data)
+        {
+            exportData.SetValue(kvp.Key, kvp.Value);
+        }
+        return exportData;
+    }
 }

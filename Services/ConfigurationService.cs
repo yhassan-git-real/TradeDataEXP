@@ -17,6 +17,19 @@ namespace TradeDataEXP.Services
         string GetViewName();
         int GetQueryTimeout();
         int GetQueryTopLimit();
+        
+        // Column mapping methods
+        string GetColumnName(string logicalColumnName);
+        string GetHsCodeColumn();
+        string GetProductColumn();
+        string GetExporterNameColumn();
+        string GetIecColumn();
+        string GetForeignImporterColumn();
+        string GetDestinationCountryColumn();
+        string GetPortOriginColumn();
+        string GetMonthSerialColumn();
+        string GetSbDateColumn();
+        string GetOrderByColumn();
     }
 
     public class ConfigurationService : IConfigurationService
@@ -84,7 +97,11 @@ namespace TradeDataEXP.Services
                 "DB_SERVER", "DB_NAME", "DB_USER", "DB_PASSWORD",
                 "DB_VIEW_NAME", "DB_SCHEMA", "STORED_PROCEDURE_NAME",
                 "LOG_DIRECTORY", "LOG_FILENAME_BASE", "OUTPUT_DIRECTORY",
-                "QUERY_TOP_LIMIT", "QUERY_TIMEOUT"
+                "QUERY_TOP_LIMIT", "QUERY_TIMEOUT",
+                // Column mapping keys
+                "COLUMN_HS_CODE", "COLUMN_PRODUCT", "COLUMN_EXPORTER_NAME",
+                "COLUMN_IEC", "COLUMN_FOREIGN_IMPORTER", "COLUMN_DESTINATION_COUNTRY",
+                "COLUMN_PORT_ORIGIN", "COLUMN_MONTH_SERIAL", "COLUMN_SB_DATE", "COLUMN_ORDER_BY"
             };
 
             var missingKeys = new List<string>();
@@ -203,6 +220,62 @@ namespace TradeDataEXP.Services
         public int GetQueryTopLimit()
         {
             return GetValue<int>("QUERY_TOP_LIMIT");
+        }
+
+        // Column mapping methods implementation
+        public string GetColumnName(string logicalColumnName)
+        {
+            return GetValue($"COLUMN_{logicalColumnName.ToUpper()}");
+        }
+
+        public string GetHsCodeColumn()
+        {
+            return GetValue("COLUMN_HS_CODE");
+        }
+
+        public string GetProductColumn()
+        {
+            return GetValue("COLUMN_PRODUCT");
+        }
+
+        public string GetExporterNameColumn()
+        {
+            return GetValue("COLUMN_EXPORTER_NAME");
+        }
+
+        public string GetIecColumn()
+        {
+            return GetValue("COLUMN_IEC");
+        }
+
+        public string GetForeignImporterColumn()
+        {
+            return GetValue("COLUMN_FOREIGN_IMPORTER");
+        }
+
+        public string GetDestinationCountryColumn()
+        {
+            return GetValue("COLUMN_DESTINATION_COUNTRY");
+        }
+
+        public string GetPortOriginColumn()
+        {
+            return GetValue("COLUMN_PORT_ORIGIN");
+        }
+
+        public string GetMonthSerialColumn()
+        {
+            return GetValue("COLUMN_MONTH_SERIAL");
+        }
+
+        public string GetSbDateColumn()
+        {
+            return GetValue("COLUMN_SB_DATE");
+        }
+
+        public string GetOrderByColumn()
+        {
+            return GetValue("COLUMN_ORDER_BY");
         }
     }
 }

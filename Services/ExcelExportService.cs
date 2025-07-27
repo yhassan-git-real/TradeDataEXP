@@ -33,23 +33,28 @@ public class ExcelExportService : IExcelExportService
             var worksheetName = _configService.GetValue("EXCEL_WORKSHEET_NAME", "Export Data");
             var worksheet = workbook.Worksheets.Add(worksheetName);
 
-            // Add headers
-            var headers = new[]
+            // Add headers dynamically from the first data record
+            var dataList = data.ToList();
+            if (!dataList.Any())
             {
-                "SB NO", "HS4", "SB Date", "HS Code", "Product", "QTY", "Unit",
-                "Unit Rate (FC)", "Unit Rate Currency", "Value (FC)", "Total SB Value (INR Lacs)",
-                "Unit Rate (INR)", "FOB USD", "Unit Rate USD", "Port of Destination",
-                "Country of Destination", "Port of Origin", "Ship Mode", "IEC",
-                "Indian Exporter Name", "Exporter Add1", "Exporter Add2", "Exporter City",
-                "Pin", "Foreign Importer Name", "Foreign Add1", "Item No", "Invoice No",
-                "Draw Back", "CHA No", "CHA Name", "Std Qty"
-            };
+                // If no data, create empty worksheet with message
+                worksheet.Cell(1, 1).Value = "No data available for export";
+                var outputDir = _configService.GetOutputDirectory();
+                Directory.CreateDirectory(outputDir);
+                var filePath = Path.Combine(outputDir, $"{fileName}_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx");
+                workbook.SaveAs(filePath);
+                return filePath;
+            }
 
-            // Set headers
-            for (int i = 0; i < headers.Length; i++)
+            // Get column names dynamically from the first record
+            var firstRecord = dataList.First();
+            var columnNames = firstRecord.GetColumnNames().ToList();
+
+            // Set headers dynamically
+            for (int i = 0; i < columnNames.Count; i++)
             {
                 var cell = worksheet.Cell(1, i + 1);
-                cell.Value = headers[i];
+                cell.Value = FormatColumnHeader(columnNames[i]);
                 cell.Style.Font.Bold = true;
                 cell.Style.Fill.BackgroundColor = XLColor.LightBlue;
                 cell.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
