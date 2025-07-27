@@ -78,13 +78,25 @@ public class DatabaseService : IDatabaseService
         var topLimit = maxRows ?? _configService.GetQueryTopLimit();
         var viewName = _configService.GetViewName();
         var timeout = _configService.GetQueryTimeout();
+        var orderByColumn = _configService.GetOrderByColumn();
 
         var query = $@"
             SELECT TOP {topLimit} *
             FROM {viewName}
-            ORDER BY [SB_Date] DESC";
+            ORDER BY [{orderByColumn}] DESC";
 
-        return await connection.QueryAsync<ExportData>(query, commandTimeout: timeout);
+        // Use dynamic query to avoid hardcoded column mapping
+        var dynamicResults = await connection.QueryAsync(query, commandTimeout: timeout);
+        
+        // Convert dynamic results to ExportData objects
+        var exportDataList = new List<ExportData>();
+        foreach (var row in dynamicResults)
+        {
+            var rowDict = (IDictionary<string, object>)row;
+            exportDataList.Add(ExportData.FromDictionary(rowDict));
+        }
+        
+        return exportDataList;
     }
 
     public async Task<IEnumerable<ExportData>> GetExportDataAsync(ExportParameters parameters)
@@ -96,14 +108,26 @@ public class DatabaseService : IDatabaseService
         var topLimit = _configService.GetQueryTopLimit();
         var viewName = _configService.GetViewName();
         var timeout = _configService.GetQueryTimeout();
+        var orderByColumn = _configService.GetOrderByColumn();
 
         var query = $@"
             SELECT TOP {topLimit} *
             FROM {viewName}
             {whereClause}
-            ORDER BY [SB_Date] DESC";
+            ORDER BY [{orderByColumn}] DESC";
 
-        return await connection.QueryAsync<ExportData>(query, commandTimeout: timeout);
+        // Use dynamic query to avoid hardcoded column mapping
+        var dynamicResults = await connection.QueryAsync(query, commandTimeout: timeout);
+        
+        // Convert dynamic results to ExportData objects
+        var exportDataList = new List<ExportData>();
+        foreach (var row in dynamicResults)
+        {
+            var rowDict = (IDictionary<string, object>)row;
+            exportDataList.Add(ExportData.FromDictionary(rowDict));
+        }
+        
+        return exportDataList;
     }    public string GetConnectionString()
     {
         return _connectionString;
@@ -115,44 +139,52 @@ public class DatabaseService : IDatabaseService
 
         if (!string.IsNullOrWhiteSpace(parameters.HsCode))
         {
-            conditions.Add($"[HS_Code] LIKE '{SanitizeInput(parameters.HsCode)}%'");
+            var columnName = _configService.GetHsCodeColumn();
+            conditions.Add($"[{columnName}] LIKE '{SanitizeInput(parameters.HsCode)}%'");
         }
 
         if (!string.IsNullOrWhiteSpace(parameters.Product))
         {
-            conditions.Add($"[Product] LIKE '%{SanitizeInput(parameters.Product)}%'");
+            var columnName = _configService.GetProductColumn();
+            conditions.Add($"[{columnName}] LIKE '%{SanitizeInput(parameters.Product)}%'");
         }
 
         if (!string.IsNullOrWhiteSpace(parameters.ExporterName))
         {
-            conditions.Add($"[Indian Exporter Name] LIKE '%{SanitizeInput(parameters.ExporterName)}%'");
+            var columnName = _configService.GetExporterNameColumn();
+            conditions.Add($"[{columnName}] LIKE '%{SanitizeInput(parameters.ExporterName)}%'");
         }
 
         if (!string.IsNullOrWhiteSpace(parameters.Iec))
         {
-            conditions.Add($"[iec] LIKE '{SanitizeInput(parameters.Iec)}%'");
+            var columnName = _configService.GetIecColumn();
+            conditions.Add($"[{columnName}] LIKE '{SanitizeInput(parameters.Iec)}%'");
         }
 
         if (!string.IsNullOrWhiteSpace(parameters.ForeignParty))
         {
-            conditions.Add($"[Foreign Importer Name] LIKE '%{SanitizeInput(parameters.ForeignParty)}%'");
+            var columnName = _configService.GetForeignImporterColumn();
+            conditions.Add($"[{columnName}] LIKE '%{SanitizeInput(parameters.ForeignParty)}%'");
         }
 
         if (!string.IsNullOrWhiteSpace(parameters.ForeignCountry))
         {
-            conditions.Add($"[Ctry of Destination] LIKE '%{SanitizeInput(parameters.ForeignCountry)}%'");
+            var columnName = _configService.GetDestinationCountryColumn();
+            conditions.Add($"[{columnName}] LIKE '%{SanitizeInput(parameters.ForeignCountry)}%'");
         }
 
         if (!string.IsNullOrWhiteSpace(parameters.Port))
         {
-            conditions.Add($"[port of origin] LIKE '%{SanitizeInput(parameters.Port)}%'");
+            var columnName = _configService.GetPortOriginColumn();
+            conditions.Add($"[{columnName}] LIKE '%{SanitizeInput(parameters.Port)}%'");
         }
 
         if (!string.IsNullOrWhiteSpace(parameters.FromMonthSerial))
         {
             if (int.TryParse(parameters.FromMonthSerial, out int fromMonth))
             {
-                conditions.Add($"[MonthSerial] >= {fromMonth}");
+                var columnName = _configService.GetMonthSerialColumn();
+                conditions.Add($"[{columnName}] >= {fromMonth}");
             }
         }
 
@@ -160,7 +192,8 @@ public class DatabaseService : IDatabaseService
         {
             if (int.TryParse(parameters.ToMonthSerial, out int toMonth))
             {
-                conditions.Add($"[MonthSerial] <= {toMonth}");
+                var columnName = _configService.GetMonthSerialColumn();
+                conditions.Add($"[{columnName}] <= {toMonth}");
             }
         }
 
