@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -15,6 +17,10 @@ public partial class MainViewModel : ObservableObject
     private readonly IDatabaseService _databaseService;
     private readonly IExcelExportService _excelExportService;
     private readonly IConfigurationService _configService;
+    private readonly IMultiParameterService _multiParameterService;
+    private readonly IEnhancedMultiParameterService _enhancedMultiParameterService;
+    private readonly IEnhancedLoggingService _enhancedLoggingService;
+    private CancellationTokenSource? _cancellationTokenSource;
 
     [ObservableProperty]
     private ExportParameters parameters = new();
@@ -31,11 +37,37 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private string databaseStatus = string.Empty;
 
-    public MainViewModel() : this(new ConfigurationService(), null, null)
+    // Multi-parameter export progress properties
+    [ObservableProperty]
+    private bool isMultiExportInProgress = false;
+
+    [ObservableProperty]
+    private int multiExportProgress = 0;
+
+    [ObservableProperty]
+    private string multiExportStatus = string.Empty;
+
+    [ObservableProperty]
+    private string multiExportDetails = string.Empty;
+
+    [ObservableProperty]
+    private bool canCancelMultiExport = false;
+
+    // Universal cancellation properties
+    [ObservableProperty]
+    private bool isAnyOperationInProgress = false;
+
+    [ObservableProperty]
+    private bool canCancelOperation = false;
+
+    [ObservableProperty]
+    private string currentOperationType = string.Empty;
+
+    public MainViewModel() : this(new ConfigurationService(), null, null, null)
     {
     }
 
-    public MainViewModel(IConfigurationService configService, IDatabaseService? databaseService = null, IExcelExportService? excelExportService = null)
+    public MainViewModel(IConfigurationService configService, IDatabaseService? databaseService = null, IExcelExportService? excelExportService = null, IMultiParameterService? multiParameterService = null)
     {
         try
         {
@@ -43,7 +75,13 @@ public partial class MainViewModel : ObservableObject
             
             _configService = configService ?? throw new ArgumentNullException(nameof(configService));
             
-            // Initialize database status dynamically from configuration
+            // Initialize enhanced logging service first
+            TradeDataEXP.App.LogMessage("Creating EnhancedLoggingService...");
+            _enhancedLoggingService = new EnhancedLoggingService(_configService);
+            TradeDataEXP.App.LogMessage("EnhancedLoggingService created");
+            
+            _enhancedLoggingService.LogSystemEvent("MainViewModel initialization started");
+            
             var server = _configService.GetValue("DB_SERVER", "Unknown");
             var database = _configService.GetValue("DB_NAME", "Unknown");
             var user = _configService.GetValue("DB_USER", "Unknown");
@@ -61,6 +99,14 @@ public partial class MainViewModel : ObservableObject
             _excelExportService = excelExportService ?? new ExcelExportService(_configService);
             TradeDataEXP.App.LogMessage("ExcelExportService created");
             
+            TradeDataEXP.App.LogMessage("Creating MultiParameterService...");
+            _multiParameterService = multiParameterService ?? new MultiParameterService(_databaseService, _excelExportService, _configService);
+            TradeDataEXP.App.LogMessage("MultiParameterService created");
+            
+            TradeDataEXP.App.LogMessage("Creating EnhancedMultiParameterService...");
+            _enhancedMultiParameterService = new EnhancedMultiParameterService(_databaseService, _excelExportService, _configService, _enhancedLoggingService);
+            TradeDataEXP.App.LogMessage("EnhancedMultiParameterService created");
+            
             var now = DateTime.Now;
             TradeDataEXP.App.LogMessage($"Setting default date range for {now:yyyy-MM}");
             Parameters.FromMonthSerial = (now.Year * 100 + now.Month).ToString();
@@ -71,6 +117,7 @@ public partial class MainViewModel : ObservableObject
         }
         catch (Exception ex)
         {
+            _enhancedLoggingService?.LogError("MainViewModel constructor failed", ex);
             TradeDataEXP.App.LogMessage($"ERROR in MainViewModel constructor: {ex}");
             throw;
         }
@@ -84,30 +131,64 @@ public partial class MainViewModel : ObservableObject
 
         try
         {
+            // Log all user input parameters for single export
+            _enhancedLoggingService.LogSingleExportParameters(
+                Parameters.HsCode, Parameters.Product, Parameters.ExporterName, Parameters.Iec,
+                Parameters.ForeignParty, Parameters.ForeignCountry, Parameters.Port, 
+                Parameters.FromMonthSerial, Parameters.ToMonthSerial);
+
+            // Create new cancellation token for this operation
+            _cancellationTokenSource?.Cancel();
+            _cancellationTokenSource = new CancellationTokenSource();
+            
+            // Set operation state
             IsLoading = true;
+            IsAnyOperationInProgress = true;
+            CanCancelOperation = true;
+            CurrentOperationType = "Single Export";
             StatusMessage = "Executing stored procedure...";
 
-            // Execute the stored procedure
+            // Execute the stored procedure with cancellation support
+            _enhancedLoggingService.LogSingleExport("🚀 Starting single export operation with cancellation support");
             await _databaseService.ExecuteExportDataStoredProcedureAsync(Parameters);
 
+            // Check for cancellation
+            _cancellationTokenSource.Token.ThrowIfCancellationRequested();
+
             StatusMessage = "Fetching all data for export...";
+            _enhancedLoggingService.LogSingleExport("📊 Fetching export data for single operation");
 
             var data = await _databaseService.GetExportDataAsync();
             var dataList = data.ToList();
+            
+            // Log database query result
+            _enhancedLoggingService.LogDatabaseQuery("Single Export", Parameters, dataList.Count);
+
+            // Check for cancellation
+            _cancellationTokenSource.Token.ThrowIfCancellationRequested();
 
             if (!dataList.Any())
             {
+                _enhancedLoggingService.LogSingleExport("❌ No data found for the specified criteria");
                 MessageBox.Show("No data found for the specified criteria.", "No Data", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
             StatusMessage = "Generating Excel file...";
+            _enhancedLoggingService.LogSingleExport($"📄 Generating Excel file for {dataList.Count} records");
 
             var fileName = GenerateFileName();
 
+            // Check for cancellation before file creation
+            _cancellationTokenSource.Token.ThrowIfCancellationRequested();
+
             var filePath = await _excelExportService.ExportToExcelAsync(dataList, fileName);
 
+            // Check for cancellation
+            _cancellationTokenSource.Token.ThrowIfCancellationRequested();
+
             StatusMessage = $"Excel exported: {dataList.Count} records";
+            _enhancedLoggingService.LogSingleExport($"✅ Single export completed successfully: {dataList.Count} records exported to {filePath}");
             
             var result = MessageBox.Show($"Excel file exported successfully!\n\nFile: {filePath}\n\nRecords: {dataList.Count:N0}\n\nWould you like to open the file?", 
                 "Export Successful", MessageBoxButton.YesNo, MessageBoxImage.Information);
@@ -121,14 +202,28 @@ public partial class MainViewModel : ObservableObject
                 });
             }
         }
+        catch (OperationCanceledException)
+        {
+            StatusMessage = "Single export was cancelled";
+            TradeDataEXP.App.LogMessage("⏹️ Single export operation was cancelled by user");
+            MessageBox.Show("Single export operation was cancelled.", "Export Cancelled", 
+                MessageBoxButton.OK, MessageBoxImage.Information);
+        }
         catch (Exception ex)
         {
+            _enhancedLoggingService.LogError("Single export operation failed", ex);
             StatusMessage = $"Error: {ex.Message}";
+            TradeDataEXP.App.LogMessage($"❌ Single export failed: {ex.Message}");
             MessageBox.Show($"Error exporting to Excel: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
         finally
         {
             IsLoading = false;
+            IsAnyOperationInProgress = false;
+            CanCancelOperation = false;
+            CurrentOperationType = string.Empty;
+            _cancellationTokenSource?.Dispose();
+            _cancellationTokenSource = null;
         }
     }
 
@@ -160,6 +255,234 @@ public partial class MainViewModel : ObservableObject
     private void ToggleTheme()
     {
         IsDarkMode = !IsDarkMode;
+    }
+
+    [RelayCommand]
+    private async Task DownloadMultipleExcel()
+    {
+        if (!ValidateInputs())
+            return;
+
+        try
+        {
+            // Log all user input parameters for multi export
+            _enhancedLoggingService.LogMultiExportParameters(
+                Parameters.HsCode, Parameters.Product, Parameters.ExporterName, Parameters.Iec,
+                Parameters.ForeignParty, Parameters.ForeignCountry, Parameters.Port, 
+                Parameters.FromMonthSerial, Parameters.ToMonthSerial);
+
+            // Create new cancellation token for this operation
+            _cancellationTokenSource?.Cancel();
+            _cancellationTokenSource = new CancellationTokenSource();
+            
+            IsLoading = true;
+            IsMultiExportInProgress = true;
+            IsAnyOperationInProgress = true;
+            CanCancelMultiExport = true;
+            CanCancelOperation = true;
+            CurrentOperationType = "Multi-Export";
+            StatusMessage = "Initializing multi-parameter export...";
+            MultiExportStatus = "Calculating combinations...";
+            MultiExportProgress = 0;
+
+            _enhancedLoggingService.LogMultiExport("🚀 Starting enhanced multi-parameter export with cancellation support");
+
+            var multiRequest = MultiParameterRequest.FromExportParameters(Parameters);
+            
+            // Log all generated combinations
+            var allCombinations = GenerateAllCombinationsForLogging(multiRequest);
+            _enhancedLoggingService.LogAllCombinations(allCombinations);
+            var totalCombinations = multiRequest.TotalCombinations;
+
+            if (totalCombinations > 100)
+            {
+                var confirmResult = MessageBox.Show(
+                    $"This will generate {totalCombinations} files. This may take a long time.\n\n" +
+                    $"Estimated processing time: {EstimateProcessingTime(totalCombinations)}\n\n" +
+                    $"Do you want to continue?",
+                    "Multiple File Export Confirmation",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Question);
+
+                if (confirmResult != MessageBoxResult.Yes)
+                {
+                    StatusMessage = "Multi-parameter export cancelled";
+                    return;
+                }
+            }
+
+            // Get output directory from config
+            var outputDir = _configService.GetValue("OUTPUT_DIRECTORY", Environment.GetFolderPath(Environment.SpecialFolder.Desktop));
+            Directory.CreateDirectory(outputDir);
+
+            MultiExportStatus = $"Processing {totalCombinations} combinations...";
+            MultiExportDetails = $"Using enhanced parallel processing • Concurrency: {_enhancedMultiParameterService.CalculateOptimalConcurrency(totalCombinations)}";
+
+            TradeDataEXP.App.LogMessage($"📊 Processing {totalCombinations} combinations using enhanced service");
+
+            // Create progress reporter
+            var progress = new Progress<ExportProgress>(progressInfo =>
+            {
+                MultiExportProgress = (int)progressInfo.ProgressPercentage;
+                MultiExportStatus = progressInfo.CurrentOperation;
+                
+                var eta = progressInfo.EstimatedTimeRemaining;
+                var etaText = eta.HasValue ? $" • ETA: {eta.Value:hh\\:mm\\:ss}" : "";
+                
+                var recoveryText = progressInfo.RecoveredExports > 0 ? $" • Recovered: {progressInfo.RecoveredExports}" : "";
+                var validationText = progressInfo.ValidationErrors > 0 ? $" • Validation Errors: {progressInfo.ValidationErrors}" : "";
+                
+                MultiExportDetails = $"Combination {progressInfo.CurrentCombination}/{progressInfo.TotalCombinations} • " +
+                                   $"Success: {progressInfo.SuccessfulExports} • Failed: {progressInfo.FailedExports}{recoveryText}{validationText}{etaText}";
+                
+                StatusMessage = $"Processing: {progressInfo.ProgressPercentage:F1}% complete";
+            });
+
+            // Execute enhanced multi-parameter export
+            var result = await _enhancedMultiParameterService.ProcessMultipleParametersAsync(
+                multiRequest, 
+                outputDir, 
+                progress, 
+                _cancellationTokenSource.Token);
+
+            // Update final status
+            MultiExportProgress = 100;
+            StatusMessage = $"Enhanced multi-parameter export completed: {result.SuccessfulExports}/{result.TotalCombinations} files";
+            MultiExportStatus = "Export completed";
+            MultiExportDetails = $"Total time: {result.ProcessingTime:hh\\:mm\\:ss} • " +
+                               $"Success rate: {result.SuccessRate:F1}%";
+
+            TradeDataEXP.App.LogMessage($"✅ Enhanced multi-parameter export completed: {result.SuccessfulExports}/{result.TotalCombinations} files successful");
+
+            // Show results dialog
+            var message = $"Enhanced Multi-Parameter Export Completed!\n\n" +
+                         $"📊 Total combinations: {result.TotalCombinations}\n" +
+                         $"✅ Successful files: {result.SuccessfulExports}\n" +
+                         $"❌ Failed files: {result.FailedExports}\n";
+
+            // Add recovery information if any files were recovered
+            var recoveredCount = result.FileResults.Count(fr => fr.Message?.Contains("Recovered") == true);
+            if (recoveredCount > 0)
+            {
+                message += $"🔄 Recovered files: {recoveredCount}\n";
+            }
+
+            message += $"📁 Output directory: {result.OutputDirectory}\n" +
+                      $"⏱️ Processing time: {result.ProcessingTime:hh\\:mm\\:ss}\n" +
+                      $"📈 Success rate: {result.SuccessRate:F1}%";
+
+            if (result.FailedExports > 0)
+            {
+                message += "\n\n⚠️ Some files failed to export even after recovery attempts. Check the log for details.";
+            }
+
+            if (recoveredCount > 0)
+            {
+                message += $"\n\n🔄 {recoveredCount} files required recovery operations but were successfully created.";
+            }
+
+            MessageBox.Show(message, "Enhanced Multi-Parameter Export Results", MessageBoxButton.OK, 
+                result.IsSuccess ? MessageBoxImage.Information : MessageBoxImage.Warning);
+        }
+        catch (OperationCanceledException)
+        {
+            StatusMessage = "Multi-parameter export was cancelled";
+            MultiExportStatus = "Export cancelled";
+            MultiExportDetails = "Operation cancelled by user";
+            TradeDataEXP.App.LogMessage("⏹️ Enhanced multi-parameter export was cancelled by user");
+            MessageBox.Show("Multi-parameter export was cancelled.", "Export Cancelled", 
+                MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            _enhancedLoggingService.LogError("Multi-parameter export operation failed", ex);
+            StatusMessage = $"Error: {ex.Message}";
+            MultiExportStatus = "Export failed";
+            MultiExportDetails = ex.Message;
+            TradeDataEXP.App.LogMessage($"❌ Enhanced multi-parameter export failed: {ex.Message}");
+            MessageBox.Show($"Error during enhanced multi-parameter export: {ex.Message}", "Error", 
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            IsLoading = false;
+            IsMultiExportInProgress = false;
+            IsAnyOperationInProgress = false;
+            CanCancelMultiExport = false;
+            CanCancelOperation = false;
+            CurrentOperationType = string.Empty;
+            _cancellationTokenSource?.Dispose();
+            _cancellationTokenSource = null;
+        }
+    }
+
+    [RelayCommand]
+    private void CancelOperation()
+    {
+        if (_cancellationTokenSource != null && !_cancellationTokenSource.Token.IsCancellationRequested)
+        {
+            // There's an active operation to cancel
+            TradeDataEXP.App.LogMessage($"⏹️ User requested cancellation of {CurrentOperationType} operation");
+            _cancellationTokenSource.Cancel();
+            
+            if (!string.IsNullOrEmpty(CurrentOperationType))
+            {
+                StatusMessage = $"Cancelling {CurrentOperationType}...";
+                
+                if (IsMultiExportInProgress)
+                {
+                    MultiExportStatus = "Cancelling export...";
+                    MultiExportDetails = "Please wait while current operations complete";
+                }
+            }
+            else
+            {
+                StatusMessage = "Cancelling operation...";
+            }
+            
+            TradeDataEXP.App.LogMessage($"🔄 Cancellation token triggered for {CurrentOperationType} operation");
+        }
+        else
+        {
+            // No operation is running - provide feedback
+            StatusMessage = "No operation is currently running to cancel";
+            TradeDataEXP.App.LogMessage("⚠️ Cancel requested but no operation is currently running");
+            
+            // Optional: Reset any stuck states
+            if (IsAnyOperationInProgress || IsMultiExportInProgress || IsLoading)
+            {
+                TradeDataEXP.App.LogMessage("🔧 Resetting stuck operation states");
+                IsLoading = false;
+                IsMultiExportInProgress = false;
+                IsAnyOperationInProgress = false;
+                CanCancelMultiExport = false;
+                CanCancelOperation = false;
+                CurrentOperationType = string.Empty;
+                MultiExportStatus = "";
+                MultiExportDetails = "";
+                StatusMessage = "Reset - Ready for new operation";
+            }
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanCancelMultiExport))]
+    private void CancelMultiExport()
+    {
+        CancelOperation(); // Use the unified cancellation method
+    }
+
+    private static string EstimateProcessingTime(int combinations)
+    {
+        // Rough estimate: ~2-5 seconds per combination depending on data size
+        var estimatedSeconds = combinations * 3;
+        var timeSpan = TimeSpan.FromSeconds(estimatedSeconds);
+        
+        if (timeSpan.TotalHours >= 1)
+            return $"~{timeSpan.TotalHours:F1} hours";
+        else if (timeSpan.TotalMinutes >= 1)
+            return $"~{timeSpan.TotalMinutes:F0} minutes";
+        else
+            return $"~{timeSpan.TotalSeconds:F0} seconds";
     }
 
     private bool ValidateInputs()
@@ -283,5 +606,40 @@ public partial class MainViewModel : ObservableObject
             DatabaseStatus = "Connection Failed";
             TradeDataEXP.App.LogMessage($"Database connection test: FAILED - {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// Helper method to generate all combinations for logging purposes
+    /// </summary>
+    private IEnumerable<ParameterCombination> GenerateAllCombinationsForLogging(MultiParameterRequest request)
+    {
+        var hsCodeList = request.HsCodes;
+        var productList = request.Products;
+        var exporterList = request.Exporters;
+        var portList = request.Ports;
+        var iecCodeList = request.IecCodes;
+        var foreignCountryList = request.ForeignCountries;
+        var foreignPartyList = request.ForeignParties;
+
+        // Generate cartesian product (all combinations)
+        return from hsCode in hsCodeList
+               from product in productList
+               from exporter in exporterList
+               from port in portList
+               from iecCode in iecCodeList
+               from foreignCountry in foreignCountryList
+               from foreignParty in foreignPartyList
+               select new ParameterCombination
+               {
+                   HsCode = hsCode,
+                   Product = product,
+                   Exporter = exporter,
+                   Port = port,
+                   IecCode = iecCode,
+                   ForeignCountry = foreignCountry,
+                   ForeignParty = foreignParty,
+                   FromMonth = request.FromMonthSerial,
+                   ToMonth = request.ToMonthSerial
+               };
     }
 }
