@@ -18,7 +18,6 @@ public partial class MainViewModel : ObservableObject
     private readonly IExcelExportService _excelExportService;
     private readonly IConfigurationService _configService;
     private readonly IMultiParameterService _multiParameterService;
-    private readonly IEnhancedMultiParameterService _enhancedMultiParameterService;
     private readonly IEnhancedLoggingService _enhancedLoggingService;
     private CancellationTokenSource? _cancellationTokenSource;
 
@@ -100,12 +99,8 @@ public partial class MainViewModel : ObservableObject
             TradeDataEXP.App.LogMessage("ExcelExportService created");
             
             TradeDataEXP.App.LogMessage("Creating MultiParameterService...");
-            _multiParameterService = multiParameterService ?? new MultiParameterService(_databaseService, _excelExportService, _configService);
+            _multiParameterService = multiParameterService ?? new MultiParameterService(_databaseService, _excelExportService, _configService, _enhancedLoggingService);
             TradeDataEXP.App.LogMessage("MultiParameterService created");
-            
-            TradeDataEXP.App.LogMessage("Creating EnhancedMultiParameterService...");
-            _enhancedMultiParameterService = new EnhancedMultiParameterService(_databaseService, _excelExportService, _configService, _enhancedLoggingService);
-            TradeDataEXP.App.LogMessage("EnhancedMultiParameterService created");
             
             var now = DateTime.Now;
             TradeDataEXP.App.LogMessage($"Setting default date range for {now:yyyy-MM}");
@@ -354,7 +349,7 @@ public partial class MainViewModel : ObservableObject
             _enhancedLoggingService.EndStepTiming(operationType, "Setup Output Directory");
 
             MultiExportStatus = $"Processing {totalCombinations} combinations...";
-            MultiExportDetails = $"Using enhanced parallel processing • Concurrency: {_enhancedMultiParameterService.CalculateOptimalConcurrency(totalCombinations)}";
+            MultiExportDetails = $"Using enhanced parallel processing • Concurrency: {_multiParameterService.CalculateOptimalConcurrency(totalCombinations)}";
 
             TradeDataEXP.App.LogMessage($"📊 Processing {totalCombinations} combinations using enhanced service");
 
@@ -378,7 +373,7 @@ public partial class MainViewModel : ObservableObject
 
             // Step 3: Execute enhanced multi-parameter export
             _enhancedLoggingService.StartStepTiming(operationType, "Multi-Parameter Processing");
-            var result = await _enhancedMultiParameterService.ProcessMultipleParametersAsync(
+            var result = await _multiParameterService.ProcessMultipleParametersAsync(
                 multiRequest, 
                 outputDir, 
                 progress, 
